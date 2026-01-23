@@ -1,0 +1,13 @@
+{
+  "resources": {
+    "comment": "Add resource patterns that must be bundled into the native binary.",
+    "comment2": "JLine needs its terminal capability files; add them if you hit",
+    "comment3": "'no suitable terminal found' at runtime in native mode.",
+    "includes": [
+      {
+        "pattern": "\\QMETA-INF/services/org.jline.terminal.spi.TerminalProvider\\E"
+      }
+    ]
+  },
+  "bundles": []
+}
