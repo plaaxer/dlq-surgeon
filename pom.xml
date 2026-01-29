@@ -80,7 +80,7 @@
         <!--
             Validates the edited payload against a user-supplied JSON Schema before
             re-injection. Supports Draft-04 through Draft-2020-12. The SchemaValidator
-            class wraps this library. Schema can be passed via --schema flag or
+            class wraps this library. Schema can be passed via the -schema flag or
             discovered automatically by naming convention.
         -->
         <dependency>
@@ -256,14 +256,14 @@
                             <mainClass>${main-class}</mainClass>
                             <buildArgs>
                                 <!--
-                                    --no-fallback   → fail build if reflection metadata is missing
-                                                      (never produce a silent JVM-fallback binary)
-                                    -O2             → optimise for binary size + startup speed
-                                    --install-exit-handlers → proper SIGTERM/SIGINT handling
-                                    -H:+ReportExceptionStackTraces → full traces in native exceptions
+                                    no-fallback: fail build if reflection metadata is missing
+                                                 (never produce a silent JVM-fallback binary)
+                                    O2: optimise for binary size + startup speed
+                                    install-exit-handlers: proper SIGTERM/SIGINT handling
+                                    H:+ReportExceptionStackTraces: full traces in native exceptions
 
                                     If you hit "class not found at runtime" errors, add:
-                                      --trace-class-initialization=com.example.YourClass
+                                    trace-class-initialization=com.example.YourClass
                                     and adjust reflect-config.json or add @RegisterForReflection.
                                 -->
                                 <buildArg>--no-fallback</buildArg>

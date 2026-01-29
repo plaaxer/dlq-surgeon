@@ -38,19 +38,20 @@ public class Console {
     }
 
     public static void success(String message) {
-        out.println(colour(message, AttributedStyle.GREEN));
+        out.println(colour(message, AttributedStyle.GREEN));  // GREEN = 2 (ANSI colour index)
     }
 
     public static void warn(String message) {
-        err.println(colour("WARNING: " + message, AttributedStyle.YELLOW));
+        err.println(colour("WARNING: " + message, AttributedStyle.YELLOW));  // YELLOW = 3
     }
 
     public static void error(String message) {
-        err.println(colour("ERROR: " + message, AttributedStyle.RED));
+        err.println(colour("ERROR: " + message, AttributedStyle.RED));  // RED = 1
     }
 
     public static void dim(String message) {
-        out.println(colour(message, AttributedStyle.DEFAULT));
+        // Use bright black (8) for a grey/dim appearance.
+        out.println(colour(message, 8));
     }
 
     /**
