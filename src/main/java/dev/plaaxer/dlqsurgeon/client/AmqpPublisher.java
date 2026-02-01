@@ -39,12 +39,7 @@ public class AmqpPublisher implements Closeable {
 
         // TODO: factory.useSslProtocol(sslContext)  when TLS opts are added.
 
-        this.connection = factory.newConnection(
-                // Use a Virtual Thread for the connection's I/O loop.
-                // This is the preferred approach in Java 21+ instead of platform threads.
-                java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor(),
-                "dlq-surgeon"
-        );
+        this.connection = factory.newConnection("dlq-surgeon");
         this.channel = connection.createChannel();
 
         // Enable publisher confirms. waitForConfirmsOrDie() in publish() will block

@@ -46,8 +46,6 @@ public class ManagementClient {
     public ManagementClient(ConnectOptions opts) {
         this.http = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(5))
-                // Virtual Threads: each blocked I/O call yields the carrier thread.
-                // Executor is already VT-based when running on Java 21+.
                 .build();
 
         this.vhost = opts.vhost;
