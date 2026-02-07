@@ -1,8 +1,10 @@
 package dev.plaaxer.dlqsurgeon.client;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.plaaxer.dlqsurgeon.cli.ConnectOptions;
 import dev.plaaxer.dlqsurgeon.model.DeadLetteredMessage;
+import dev.plaaxer.dlqsurgeon.model.QueueInfo;
 
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -11,6 +13,7 @@ import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.Base64;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Thin wrapper around the RabbitMQ Management HTTP API.
@@ -59,14 +62,24 @@ public class ManagementClient {
     // ── Public API ──────────────────────────────────────────────────────────
 
     /**
-     * TODO: Implement.
      * Returns metadata for every queue in the vhost.
-     * Filter by x-dead-letter-exchange presence to identify true DLQs.
+     * Queues with {@code x-dead-letter-exchange} in their arguments are flagged as DLQs.
      */
-    public List<?> listQueues() throws Exception {
-        // GET /api/queues/{vhost}
-        // Parse response as List<Map<String,Object>> and map to a light QueueInfo record.
-        throw new UnsupportedOperationException("Not yet implemented");
+    public List<QueueInfo> listQueues() throws Exception {
+        String body = get("/queues/" + encodedVhost());
+        List<Map<String, Object>> raw = MAPPER.readValue(body, new TypeReference<>() {});
+        return raw.stream().map(this::toQueueInfo).toList();
+    }
+
+    // ── Private helpers ─────────────────────────────────────────────────────
+
+    @SuppressWarnings("unchecked")
+    private QueueInfo toQueueInfo(Map<String, Object> raw) {
+        String name = (String) raw.get("name");
+        int messages = ((Number) raw.getOrDefault("messages", 0)).intValue();
+        Map<String, Object> args = (Map<String, Object>) raw.getOrDefault("arguments", Map.of());
+        boolean isDlq = args.containsKey("x-dead-letter-exchange");
+        return new QueueInfo(name, messages, isDlq);
     }
 
     /**
@@ -92,13 +105,6 @@ public class ManagementClient {
         throw new UnsupportedOperationException("Not yet implemented");
     }
 
-    // ── Private helpers ─────────────────────────────────────────────────────
-
-    /**
-     * TODO: Implement.
-     * Builds a GET request with Basic auth and sends it, returning the body string.
-     * Throws a descriptive exception on non-2xx responses (include status + body).
-     */
     private String get(String path) throws Exception {
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(baseUrl + path))
@@ -108,7 +114,10 @@ public class ManagementClient {
                 .build();
 
         HttpResponse<String> response = http.send(request, HttpResponse.BodyHandlers.ofString());
-        // TODO: check response.statusCode(), throw on error with message from body
+        int status = response.statusCode();
+        if (status < 200 || status >= 300) {
+            throw new RuntimeException("Management API error " + status + " for " + path + ": " + response.body());
+        }
         return response.body();
     }
 
