@@ -54,7 +54,6 @@ public class ManagementClient {
         this.vhost = opts.vhost;
         this.baseUrl = "http://" + opts.host + ":" + opts.managementPort + "/api";
 
-        // Basic auth header — encode once, reuse on every request.
         String credentials = opts.user + ":" + new String(opts.password);
         this.authHeader = "Basic " + Base64.getEncoder().encodeToString(credentials.getBytes());
     }
