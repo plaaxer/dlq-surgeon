@@ -1,11 +1,13 @@
 package dev.plaaxer.dlqsurgeon.cli;
 
 import dev.plaaxer.dlqsurgeon.client.ManagementClient;
+import dev.plaaxer.dlqsurgeon.model.QueueInfo;
 import dev.plaaxer.dlqsurgeon.tui.Console;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Mixin;
 import picocli.CommandLine.Parameters;
 
+import java.util.List;
 import java.util.concurrent.Callable;
 
 /**
@@ -40,16 +42,29 @@ public class ListCommand implements Callable<Integer> {
 
     @Override
     public Integer call() throws Exception {
-        // TODO: Implement this method.
-        //
-        //  1. Build a ManagementClient from connect options.
-        //  2. If queueName is null, call managementClient.listQueues() and print a table.
-        //     If queueName is set, call managementClient.getQueue(queueName) and print details.
-        //  3. Use Console for coloured output (red if messages > 0, green if 0).
-        //  4. Return 0 on success, non-zero on error.
-        //
-        //  See: ManagementClient, Console
-        Console.info("list command — not yet implemented");
+        ManagementClient client = new ManagementClient(connect);
+
+        if (queueName != null) {
+            QueueInfo queue = client.getQueue(queueName);
+            printQueue(queue);
+        } else {
+            List<QueueInfo> queues = client.listQueues();
+            Console.dim(String.format("%-50s  %5s  %s", "QUEUE", "MSGS", "TYPE"));
+            Console.dim("-".repeat(65));
+            for (QueueInfo queue : queues) {
+                printQueue(queue);
+            }
+        }
+
         return 0;
+    }
+
+    private void printQueue(QueueInfo queue) {
+        String line = queue.label();
+        if (queue.messageCount() > 0) {
+            Console.error(line);
+        } else {
+            Console.success(line);
+        }
     }
 }

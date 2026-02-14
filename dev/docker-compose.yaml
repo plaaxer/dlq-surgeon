@@ -18,7 +18,8 @@ services:
   producer:
     container_name: messages_producer
     build:
-      context: ./seed
+      context: .
+      dockerfile: seed/Dockerfile
     depends_on:
       rabbitmq:
         condition: service_healthy
