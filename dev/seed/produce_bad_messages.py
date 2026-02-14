@@ -1,17 +1,31 @@
 import pika
 import json
 import os
+import time
 
 RABBITMQ_HOST = os.getenv("RABBITMQ_HOST", "rabbitmq")
 RABBITMQ_USER = os.getenv("RABBITMQ_USER", "user")
 RABBITMQ_PASS = os.getenv("RABBITMQ_PASS", "password")
 
-connection = pika.BlockingConnection(
-    pika.ConnectionParameters(
-        host=RABBITMQ_HOST,
-        credentials=pika.PlainCredentials(RABBITMQ_USER, RABBITMQ_PASS)
-    )
-)
+connection = None
+for i in range(10):
+    try:
+        connection = pika.BlockingConnection(
+            pika.ConnectionParameters(
+                host=RABBITMQ_HOST,
+                credentials=pika.PlainCredentials(RABBITMQ_USER, RABBITMQ_PASS)
+            )
+        )
+        print("Connected to RabbitMQ.")
+        break
+    except pika.exceptions.AMQPConnectionError:
+        print(f"Waiting for RabbitMQ... ({i+1}/10)")
+        time.sleep(3)
+
+if connection is None:
+    print("Could not connect to RabbitMQ after 10 attempts. Exiting.")
+    exit(1)
+
 channel = connection.channel()
 
 EXCHANGE = "orders"
