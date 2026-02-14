@@ -22,4 +22,4 @@ services:
     depends_on:
       rabbitmq:
         condition: service_healthy
-    restart: unless-stopped
+    restart: no

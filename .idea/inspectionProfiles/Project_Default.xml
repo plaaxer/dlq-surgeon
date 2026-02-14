@@ -2,22 +2,5 @@
   <profile version="1.0">
     <option name="myName" value="Project Default" />
     <inspection_tool class="Eslint" enabled="true" level="WARNING" enabled_by_default="true" />
-    <inspection_tool class="PyPackageRequirementsInspection" enabled="true" level="WARNING" enabled_by_default="true">
-      <option name="ignoredPackages">
-        <list>
-          <option value="argon2-cffi" />
-          <option value="argon2-cffi-bindings" />
-          <option value="backports-datetime-fromisoformat" />
-          <option value="environs" />
-          <option value="google-api" />
-          <option value="marshmallow" />
-          <option value="minio" />
-          <option value="pinecone-client" />
-          <option value="pyarrow" />
-          <option value="pycryptodome" />
-          <option value="ujson" />
-        </list>
-      </option>
-    </inspection_tool>
   </profile>
 </component>

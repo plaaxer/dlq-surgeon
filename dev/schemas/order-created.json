@@ -1,0 +1,25 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": ["orderId", "currency_code", "shippingAddress", "metadata"],
+  "properties": {
+    "orderId": { "type": "string" },
+    "currency_code": { "type": "string" },
+    "shippingAddress": {
+      "type": "object",
+      "required": ["street", "city", "country"],
+      "properties": {
+        "street": { "type": "string" },
+        "city": { "type": "string" },
+        "country": { "type": "string" }
+      }
+    },
+    "metadata": {
+      "type": "object",
+      "required": ["version"],
+      "properties": {
+        "version": { "type": "integer" }
+      }
+    }
+  }
+}
