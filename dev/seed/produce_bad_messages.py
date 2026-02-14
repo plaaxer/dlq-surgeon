@@ -1,3 +1,4 @@
+import jsonschema
 import pika
 import json
 import os
@@ -6,6 +7,11 @@ import time
 RABBITMQ_HOST = os.getenv("RABBITMQ_HOST", "rabbitmq")
 RABBITMQ_USER = os.getenv("RABBITMQ_USER", "user")
 RABBITMQ_PASS = os.getenv("RABBITMQ_PASS", "password")
+
+SCHEMA_PATH = os.path.join(os.path.dirname(__file__), "schemas", "order-created.json")
+
+with open(SCHEMA_PATH) as f:
+    schema = json.load(f)
 
 connection = None
 for i in range(10):
@@ -87,8 +93,14 @@ print("Consuming and nacking to trigger dead-lettering...")
 for _ in range(len(broken_messages)):
     method, properties, body = channel.basic_get(queue="orders.queue", auto_ack=False)
     if method:
-        channel.basic_nack(delivery_tag=method.delivery_tag, requeue=False)
-        print(f"Nacked: {json.loads(body)['orderId']}")
+        payload = json.loads(body)
+        try:
+            jsonschema.validate(instance=payload, schema=schema)
+            channel.basic_ack(delivery_tag=method.delivery_tag)
+            print(f"Valid, acked: {payload['orderId']}")
+        except jsonschema.ValidationError as e:
+            channel.basic_nack(delivery_tag=method.delivery_tag, requeue=False)
+            print(f"Invalid, nacked: {payload['orderId']} — {e.message}")
 
 connection.close()
 print("Done. Check orders.dead in the management UI.")

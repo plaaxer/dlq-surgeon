@@ -4,6 +4,6 @@ version = "0.1.0"
 description = "Add your description here"
 requires-python = ">=3.12"
 dependencies = [
-    "pika",
+    "jsonschema>=4.26.0",
     "python3-pika>=0.9.14",
 ]
