@@ -1,6 +1,6 @@
 package dev.plaaxer.dlqsurgeon.cli;
 
-import dev.plaaxer.dlqsurgeon.model.DeadLetteredMessage;
+import dev.plaaxer.dlqsurgeon.model.RabbitMessage;
 import dev.plaaxer.dlqsurgeon.surgeon.MessageFetcher;
 import dev.plaaxer.dlqsurgeon.surgeon.PayloadEditor;
 import dev.plaaxer.dlqsurgeon.surgeon.Reinjector;
@@ -96,11 +96,11 @@ public class FixCommand implements Callable<Integer> {
         //
         //  Step 1 — Fetch messages
         //    MessageFetcher fetcher = new MessageFetcher(connect);
-        //    List<DeadLetteredMessage> messages = fetcher.fetch(queueName, count);
+        //    List<RabbitMessage> messages = fetcher.fetch(queueName, count);
         //    if (messages.isEmpty()) { Console.warn("Queue is empty."); return 0; }
         //
         //  Step 2 — Let user pick a message
-        //    DeadLetteredMessage selected = MessagePicker.pick(messages);
+        //    RabbitMessage selected = MessagePicker.pick(messages);
         //    if (selected == null) return 0; // user quit
         //
         //  Step 3 — Open editor

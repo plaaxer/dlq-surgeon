@@ -1,6 +1,6 @@
 package dev.plaaxer.dlqsurgeon.tui;
 
-import dev.plaaxer.dlqsurgeon.model.DeadLetteredMessage;
+import dev.plaaxer.dlqsurgeon.model.RabbitMessage;
 import org.jline.reader.LineReader;
 import org.jline.reader.LineReaderBuilder;
 import org.jline.terminal.Terminal;
@@ -16,7 +16,7 @@ import java.util.List;
  * Used by both PeekCommand (view only) and FixCommand (select for repair).
  *
  * Interaction model:
- *   - Display the list with labels from DeadLetteredMessage.label().
+ *   - Display the list with labels from RabbitMessage.label().
  *   - Accept a number input (e.g., "3") to select a message.
  *   - Accept "q" or Ctrl+C to exit without selecting.
  *   - Accept "/" to enter search/filter mode (filter by routing key or payload content).
@@ -52,7 +52,7 @@ public class MessagePicker {
      *      - "q" or EOFException → return null
      *      - anything else → print "Invalid selection" and prompt again
      */
-    public static DeadLetteredMessage pick(List<DeadLetteredMessage> messages) throws IOException {
+    public static RabbitMessage pick(List<RabbitMessage> messages) throws IOException {
         try (Terminal terminal = TerminalBuilder.builder().system(true).build()) {
 
             printList(terminal, messages);
@@ -83,10 +83,10 @@ public class MessagePicker {
         }
     }
 
-    private static void printList(Terminal terminal, List<DeadLetteredMessage> messages) {
+    private static void printList(Terminal terminal, List<RabbitMessage> messages) {
         // TODO: Use terminal.writer() for output so JLine can manage cursor position.
         Console.info("─".repeat(70));
-        for (DeadLetteredMessage msg : messages) {
+        for (RabbitMessage msg : messages) {
             Console.info(msg.label());
         }
         Console.info("─".repeat(70));

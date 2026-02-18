@@ -2,6 +2,7 @@ package dev.plaaxer.dlqsurgeon.model;
 
 import java.util.Map;
 
+
 /**
  * An immutable value object describing the full re-injection plan for a repaired message.
  *
@@ -36,7 +37,7 @@ public record RepairPlan(
      *     "x-first-death-queue", and "x-first-death-reason" keys from the headers copy.
      */
     public static RepairPlan from(
-            DeadLetteredMessage message,
+            RabbitMessage message,
             String editedPayload,
             String targetExchangeOverride,
             String targetRoutingKeyOverride,

@@ -3,7 +3,7 @@ package dev.plaaxer.dlqsurgeon.surgeon;
 import dev.plaaxer.dlqsurgeon.cli.ConnectOptions;
 import dev.plaaxer.dlqsurgeon.client.AmqpPublisher;
 import dev.plaaxer.dlqsurgeon.client.ManagementClient;
-import dev.plaaxer.dlqsurgeon.model.DeadLetteredMessage;
+import dev.plaaxer.dlqsurgeon.model.RabbitMessage;
 import dev.plaaxer.dlqsurgeon.model.RepairPlan;
 
 /**
@@ -61,7 +61,7 @@ public class Reinjector {
      *   Throw a descriptive RuntimeException if deletion fails after a successful
      *   publish — the user needs to know to manually clean up the DLQ.
      */
-    public void reinjectAndDelete(RepairPlan plan, DeadLetteredMessage source) throws Exception {
+    public void reinjectAndDelete(RepairPlan plan, RabbitMessage source) throws Exception {
         throw new UnsupportedOperationException("Not yet implemented");
     }
 }

@@ -14,8 +14,7 @@ import java.util.Base64;
  * Low-level HTTP client for the RabbitMQ Management API.
  *
  * Handles connection setup, authentication, and response validation.
- * All methods return the raw response body as a String — JSON parsing
- * is left to the caller (ManagementClient).
+ * All methods return the raw response body as a String.
  */
 class ApiHttpClient {
 

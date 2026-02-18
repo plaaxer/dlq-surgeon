@@ -2,7 +2,9 @@ package dev.plaaxer.dlqsurgeon.surgeon;
 
 import dev.plaaxer.dlqsurgeon.cli.ConnectOptions;
 import dev.plaaxer.dlqsurgeon.client.ManagementClient;
-import dev.plaaxer.dlqsurgeon.model.DeadLetteredMessage;
+import dev.plaaxer.dlqsurgeon.model.RabbitMessage;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.List;
 
@@ -20,6 +22,8 @@ import java.util.List;
  */
 public class MessageFetcher {
 
+    private static final Logger log = LoggerFactory.getLogger(MessageFetcher.class);
+
     private final ManagementClient managementClient;
 
     public MessageFetcher(ConnectOptions opts) {
@@ -29,15 +33,13 @@ public class MessageFetcher {
     /**
      * Fetches up to {@code count} messages from {@code queueName}.
      *
-     * @return An ordered list of dead-lettered messages; empty if the queue is empty.
+     * @return An ordered list of messages; empty if the queue is empty.
      * @throws Exception on network or parsing errors.
-     *
-     * TODO: Implement by delegating to managementClient.fetchMessages().
-     *       Number the returned messages sequentially (1-based) for display.
-     *       Log a warning if count > 100 — large fetches with requeue=true can
-     *       briefly starve other consumers.
      */
-    public List<DeadLetteredMessage> fetch(String queueName, int count) throws Exception {
-        throw new UnsupportedOperationException("Not yet implemented");
+    public List<RabbitMessage> fetch(String queueName, int count) throws Exception {
+        if (count > 100) {
+            log.warn("Fetching {} messages with requeue=true — this may briefly starve other consumers", count);
+        }
+        return managementClient.fetchMessages(queueName, count);
     }
 }

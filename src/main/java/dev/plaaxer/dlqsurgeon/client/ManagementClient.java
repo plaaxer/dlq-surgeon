@@ -2,10 +2,12 @@ package dev.plaaxer.dlqsurgeon.client;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import dev.plaaxer.dlqsurgeon.cli.ConnectOptions;
-import dev.plaaxer.dlqsurgeon.model.DeadLetteredMessage;
 import dev.plaaxer.dlqsurgeon.model.QueueInfo;
+import dev.plaaxer.dlqsurgeon.model.RabbitMessage;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -18,10 +20,7 @@ import java.util.Map;
  *   POST /api/queues/{vhost}/{queue}/get           → fetch messages (requeue=true)
  *   DELETE /api/queues/{vhost}/{queue}/contents    → purge (not used in normal flow)
  *
- * Important: The /get endpoint *consumes* messages. We always pass requeue=true
- * to put them back immediately. This means messages are briefly unavailable to
- * other consumers during the fetch — negligible for DLQs which have no active
- * consumers.
+ * Reference: <a href="https://www.rabbitmq.com/docs/http-api-reference">...</a>
  *
  * TODO: Add TLS support by injecting an SSLContext into HttpClient.newBuilder().
  * TODO: Implement pagination for very large queue lists.
@@ -38,14 +37,13 @@ public class ManagementClient {
         this.vhost = opts.vhost;
     }
 
-    // ── Public API ──────────────────────────────────────────────────────────
-
     /**
      * Returns metadata for every queue in the vhost.
      * Queues with {@code x-dead-letter-exchange} in their arguments are flagged as DLQs.
      */
     public List<QueueInfo> listQueues() throws Exception {
         String body = http.get("/queues/" + encodedVhost());
+
         List<Map<String, Object>> raw = MAPPER.readValue(body, new TypeReference<>() {});
         return raw.stream().map(this::toQueueInfo).toList();
     }
@@ -56,6 +54,7 @@ public class ManagementClient {
      */
     public QueueInfo getQueue(String queueName) throws Exception {
         String body = http.get("/queues/" + encodedVhost() + "/" + queueName);
+
         Map<String, Object> raw = MAPPER.readValue(body, new TypeReference<>() {});
         return toQueueInfo(raw);
     }
@@ -79,11 +78,26 @@ public class ManagementClient {
      *
      * Map each element to a DeadLetteredMessage, parsing x-death from properties.headers.
      */
-    public List<DeadLetteredMessage> fetchMessages(String queueName, int count) throws Exception {
-        throw new UnsupportedOperationException("Not yet implemented");
+    public List<RabbitMessage> fetchMessages(String queueName, int count) throws Exception {
+        ObjectNode bodyNode = MAPPER.createObjectNode();
+        bodyNode.put("count", count);
+        bodyNode.put("ackmode", "ack_requeue_true");
+        bodyNode.put("encoding", "auto");
+        bodyNode.put("truncate", 50000);
+
+        String jsonBody = MAPPER.writeValueAsString(bodyNode);
+        String response = http.post("/queues/" + encodedVhost() + "/" + queueName, jsonBody);
+
+        List<Map<String, Object>> raw = MAPPER.readValue(response, new TypeReference<>() {});
+
+        List<RabbitMessage> result = new ArrayList<>(raw.size());
+        for (int i = 0; i < raw.size(); i++) {
+            result.add(RabbitMessage.from(raw.get(i), i + 1));
+        }
+        return result;
     }
 
-    // ── Private helpers ─────────────────────────────────────────────────────
+    // ──────────────────────────────────────────────────────────────────────────────────────────────────────────
 
     @SuppressWarnings("unchecked")
     private QueueInfo toQueueInfo(Map<String, Object> raw) {

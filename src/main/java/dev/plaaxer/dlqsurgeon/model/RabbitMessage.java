@@ -1,12 +1,13 @@
 package dev.plaaxer.dlqsurgeon.model;
 
+import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 
 /**
- * Represents a single message fetched from a Dead Letter Queue.
+ * Represents a single message fetched from a RabbitMQ queue via the Management API.
  *
- * This is an in-memory snapshot; the original message remains in the DLQ
+ * This is an in-memory snapshot; the original message remains in the queue
  * (requeued by ManagementClient.fetchMessages) until the user commits a repair.
  *
  * Fields mirror the shape returned by the Management API /get endpoint.
@@ -20,13 +21,13 @@ import java.util.Map;
  * @param payload          Message body as a UTF-8 string (decoded from base64 if needed).
  * @param contentType      MIME type from properties (may be null).
  * @param headers          Raw AMQP headers map, including x-death entries.
- * @param xDeathEntries    Parsed x-death header entries in chronological order.
+ * @param xDeathEntries    Parsed x-death header entries in chronological order; empty for non-DLQ messages.
  * @param deliveryMode     1 = non-persistent, 2 = persistent.
  * @param correlationId    Correlation ID from properties (may be null).
  * @param messageId        Message ID from properties (may be null).
  * @param redelivered      Whether this message has been redelivered before.
  */
-public record DeadLetteredMessage(
+public record RabbitMessage(
         int messageNumber,
         String exchange,
         String routingKey,
@@ -57,9 +58,6 @@ public record DeadLetteredMessage(
      * Falls back to the message's own exchange/routingKey if x-death is absent.
      *
      * This is the target for re-injection unless the user overrides with --target-* flags.
-     *
-     * TODO: Implement. The most recent x-death entry is the last element in the list
-     *       (x-death is prepended, not appended, by RabbitMQ).
      */
     public String originalExchange() {
         if (xDeathEntries.isEmpty()) return exchange;
@@ -71,5 +69,31 @@ public record DeadLetteredMessage(
         // x-death stores routing-keys as a List<String>; take the first.
         List<String> keys = xDeathEntries.getLast().routingKeys();
         return keys.isEmpty() ? routingKey : keys.getFirst();
+    }
+
+    @SuppressWarnings("unchecked")
+    public static RabbitMessage from(Map<String, Object> raw, int messageNumber) {
+        String exchange = (String) raw.get("exchange");
+        String routingKey = (String) raw.get("routing_key");
+        boolean redelivered = Boolean.TRUE.equals(raw.get("redelivered"));
+
+        String payloadRaw = (String) raw.get("payload");
+        String payload = "base64".equals(raw.get("payload_encoding"))
+                ? new String(Base64.getDecoder().decode(payloadRaw))
+                : payloadRaw;
+
+        Map<String, Object> properties = (Map<String, Object>) raw.getOrDefault("properties", Map.of());
+        String contentType = (String) properties.get("content_type");
+        int deliveryMode = ((Number) properties.getOrDefault("delivery_mode", 1)).intValue();
+        String correlationId = (String) properties.get("correlation_id");
+        String messageId = (String) properties.get("message_id");
+        Map<String, Object> headers = (Map<String, Object>) properties.getOrDefault("headers", Map.of());
+
+        List<XDeathEntry> xDeathEntries = headers.get("x-death") instanceof List<?> xDeath
+                ? ((List<Map<String, Object>>) xDeath).stream().map(XDeathEntry::from).toList()
+                : List.of();
+
+        return new RabbitMessage(messageNumber, exchange, routingKey, payload, contentType,
+                headers, xDeathEntries, deliveryMode, correlationId, messageId, redelivered);
     }
 }

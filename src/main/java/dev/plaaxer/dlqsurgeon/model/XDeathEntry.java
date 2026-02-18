@@ -1,6 +1,7 @@
 package dev.plaaxer.dlqsurgeon.model;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * Represents one entry in the x-death AMQP header array.
@@ -32,4 +33,25 @@ public record XDeathEntry(
         String reason,
         long count,
         long time
-) {}
+) {
+    @SuppressWarnings("unchecked")
+    public static XDeathEntry from(Map<String, Object> raw) {
+        String exchange = (String) raw.get("exchange");
+        List<String> routingKeys = (List<String>) raw.getOrDefault("routing-keys", List.of());
+        String queue = (String) raw.get("queue");
+        String reason = (String) raw.get("reason");
+        long count = ((Number) raw.getOrDefault("count", 0)).longValue();
+        long time = parseTimestamp(raw.get("time"));
+        return new XDeathEntry(exchange, routingKeys, queue, reason, count, time);
+    }
+
+    // The Management API returns time as {"!":"timestamp","$": epochSeconds}
+    private static long parseTimestamp(Object raw) {
+        if (raw instanceof Number n) return n.longValue();
+        if (raw instanceof Map<?, ?> m) {
+            Object val = m.get("$");
+            if (val instanceof Number n) return n.longValue();
+        }
+        return 0L;
+    }
+}
