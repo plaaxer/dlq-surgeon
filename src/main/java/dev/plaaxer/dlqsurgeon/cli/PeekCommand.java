@@ -1,8 +1,11 @@
 package dev.plaaxer.dlqsurgeon.cli;
 
+import dev.plaaxer.dlqsurgeon.model.RabbitMessage;
 import dev.plaaxer.dlqsurgeon.surgeon.MessageFetcher;
 import dev.plaaxer.dlqsurgeon.tui.Console;
 import dev.plaaxer.dlqsurgeon.tui.MessagePicker;
+
+import java.util.List;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Mixin;
 import picocli.CommandLine.Option;
@@ -48,19 +51,19 @@ public class PeekCommand implements Callable<Integer> {
 
     @Override
     public Integer call() throws Exception {
-        // TODO: Implement this method.
-        //
-        //  1. Build ManagementClient from connect options.
-        //  2. Call MessageFetcher.fetch(queueName, count) — returns List<DeadLetteredMessage>.
-        //  3. Pass messages to MessagePicker.show() for the interactive list.
-        //     When the user selects a message, display its full detail view:
-        //       - x-death entries (original exchange, routing key, death count, reason)
-        //       - Headers (prettified)
-        //       - Payload (syntax-highlighted JSON if applicable)
-        //  4. Allow the user to press 'q' to quit or 'f' to jump to `fix` for that message.
-        //
-        //  See: MessageFetcher, MessagePicker, Console, DeadLetteredMessage
-        Console.info("peek command — not yet implemented");
+        MessageFetcher fetcher = new MessageFetcher(connect);
+        List<RabbitMessage> messages = fetcher.fetch(queueName, count);
+
+        if (messages.isEmpty()) {
+            Console.warn("Queue '" + queueName + "' is empty.");
+            return 0;
+        }
+
+        RabbitMessage selected = MessagePicker.pick(messages);
+        if (selected != null) {
+            fetcher.printMessage(selected);
+        }
+
         return 0;
     }
 }

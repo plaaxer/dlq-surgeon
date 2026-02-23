@@ -39,7 +39,8 @@ public class ManagementClient {
 
     /**
      * Returns metadata for every queue in the vhost.
-     * Queues with {@code x-dead-letter-exchange} in their arguments are flagged as DLQs.
+     * Queues with {@code x-dead-letter-exchange} in their arguments are flagged with {@code hasDlx=true},
+     * meaning dead messages from those queues are forwarded to another exchange — not that they are DLQs themselves.
      */
     public List<QueueInfo> listQueues() throws Exception {
         String body = http.get("/queues/" + encodedVhost());
@@ -86,7 +87,7 @@ public class ManagementClient {
         bodyNode.put("truncate", 50000);
 
         String jsonBody = MAPPER.writeValueAsString(bodyNode);
-        String response = http.post("/queues/" + encodedVhost() + "/" + queueName, jsonBody);
+        String response = http.post("/queues/" + encodedVhost() + "/" + queueName + "/get", jsonBody);
 
         List<Map<String, Object>> raw = MAPPER.readValue(response, new TypeReference<>() {});
 
@@ -104,8 +105,8 @@ public class ManagementClient {
         String name = (String) raw.get("name");
         int messages = ((Number) raw.getOrDefault("messages", 0)).intValue();
         Map<String, Object> args = (Map<String, Object>) raw.getOrDefault("arguments", Map.of());
-        boolean isDlq = args.containsKey("x-dead-letter-exchange");
-        return new QueueInfo(name, messages, isDlq);
+        boolean hasDlx = args.containsKey("x-dead-letter-exchange");
+        return new QueueInfo(name, messages, hasDlx);
     }
 
     /**

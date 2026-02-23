@@ -1,13 +1,10 @@
 package dev.plaaxer.dlqsurgeon.cli;
 
-import dev.plaaxer.dlqsurgeon.client.ManagementClient;
-import dev.plaaxer.dlqsurgeon.model.QueueInfo;
-import dev.plaaxer.dlqsurgeon.tui.Console;
+import dev.plaaxer.dlqsurgeon.surgeon.MessageFetcher;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Mixin;
 import picocli.CommandLine.Parameters;
 
-import java.util.List;
 import java.util.concurrent.Callable;
 
 /**
@@ -42,29 +39,14 @@ public class ListCommand implements Callable<Integer> {
 
     @Override
     public Integer call() throws Exception {
-        ManagementClient client = new ManagementClient(connect);
+        MessageFetcher fetcher = new MessageFetcher(connect);
 
         if (queueName != null) {
-            QueueInfo queue = client.getQueue(queueName);
-            printQueue(queue);
+            fetcher.printQueue(fetcher.getQueue(queueName));
         } else {
-            List<QueueInfo> queues = client.listQueues();
-            Console.dim(String.format("%-50s  %5s  %s", "QUEUE", "MSGS", "TYPE"));
-            Console.dim("-".repeat(65));
-            for (QueueInfo queue : queues) {
-                printQueue(queue);
-            }
+            fetcher.printQueueList(fetcher.listQueues());
         }
 
         return 0;
-    }
-
-    private void printQueue(QueueInfo queue) {
-        String line = queue.label();
-        if (queue.messageCount() > 0) {
-            Console.error(line);
-        } else {
-            Console.success(line);
-        }
     }
 }

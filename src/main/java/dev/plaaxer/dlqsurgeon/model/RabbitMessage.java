@@ -1,5 +1,8 @@
 package dev.plaaxer.dlqsurgeon.model;
 
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.Base64;
 import java.util.List;
 import java.util.Map;
@@ -41,16 +44,25 @@ public record RabbitMessage(
         boolean redelivered
 ) {
 
+    private static final DateTimeFormatter LABEL_FMT =
+            DateTimeFormatter.ofPattern("MM-dd HH:mm:ss").withZone(ZoneId.systemDefault());
+
     /**
      * Returns a short display label for use in the message picker list.
-     * Example: "#3  orders.created  → dead.letter.exchange  (died 4×)"
+     * Example: "#3  orders.created  → orders.dlx  rejected  03-23 16:49:08"
      */
     public String label() {
-        int deathCount = Math.toIntExact(xDeathEntries.stream()
-                .mapToLong(XDeathEntry::count)
-                .sum());
-        return String.format("#%-3d %-40s → %-30s (died %d×)",
-                messageNumber, routingKey, exchange, deathCount);
+        String reason = "";
+        String time = "";
+        if (!xDeathEntries.isEmpty()) {
+            XDeathEntry last = xDeathEntries.getLast();
+            reason = last.reason();
+            if (last.time() > 0) {
+                time = LABEL_FMT.format(Instant.ofEpochSecond(last.time()));
+            }
+        }
+        return String.format("#%-3d %-30s → %-25s %-10s %s",
+                messageNumber, routingKey, exchange, reason, time);
     }
 
     /**

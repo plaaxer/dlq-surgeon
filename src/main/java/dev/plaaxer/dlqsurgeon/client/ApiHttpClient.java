@@ -25,6 +25,7 @@ class ApiHttpClient {
     ApiHttpClient(ConnectOptions opts) {
         this.http = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(5))
+                .version(HttpClient.Version.HTTP_1_1)
                 .build();
 
         this.baseUrl = "http://" + opts.host + ":" + opts.managementPort + "/api";

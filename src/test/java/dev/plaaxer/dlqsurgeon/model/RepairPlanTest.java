@@ -22,7 +22,7 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 class RepairPlanTest {
 
-    private DeadLetteredMessage sampleMessage() {
+    private RabbitMessage sampleMessage() {
         XDeathEntry death = new XDeathEntry(
                 "orders",               // original exchange
                 List.of("orders.created"), // original routing keys
@@ -31,7 +31,7 @@ class RepairPlanTest {
                 3L,
                 System.currentTimeMillis()
         );
-        return new DeadLetteredMessage(
+        return new RabbitMessage(
                 1,
                 "orders.dead",          // exchange (the DLX)
                 "orders.created",

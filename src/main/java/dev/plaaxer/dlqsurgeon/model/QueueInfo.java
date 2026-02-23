@@ -6,16 +6,17 @@ package dev.plaaxer.dlqsurgeon.model;
  *
  * @param name         Queue name.
  * @param messageCount Total messages currently in the queue.
- * @param isDlq        True when the queue has {@code x-dead-letter-exchange} set in its
- *                     arguments — i.e. it is itself a dead-letter queue.
+ * @param hasDlx       True when the queue has {@code x-dead-letter-exchange} set in its
+ *                     arguments. This means dead messages from this queue are routed to
+ *                     another exchange (and ultimately a dead-letter queue). It does NOT
+ *                     mean this queue is itself a dead-letter queue.
  */
 public record QueueInfo(
         String name,
         int messageCount,
-        boolean isDlq
+        boolean hasDlx
 ) {
-    /** One-line label for the interactive queue picker. */
     public String label() {
-        return String.format("%-50s  %5d msg%s", name, messageCount, isDlq ? "  [DLQ]" : "");
+        return String.format("%-50s  %5d msg%s", name, messageCount, hasDlx ? "  [DLX]" : "");
     }
 }
