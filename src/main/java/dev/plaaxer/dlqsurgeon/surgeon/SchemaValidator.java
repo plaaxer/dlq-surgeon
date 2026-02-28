@@ -35,18 +35,19 @@ public class SchemaValidator {
      *
      * @throws ValidationException if any validation errors are found.
      * @throws IOException         if the schema file cannot be read.
-     *
-     * TODO: Implement.
-     *   1. Read schemaFile into a String and parse with MAPPER.readTree().
-     *   2. Detect draft version from the "$schema" URI in the root node.
-     *      Use JsonSchemaFactory.getInstance(SpecVersion.VersionFlag.V202012) as default.
-     *   3. JsonSchema schema = factory.getSchema(schemaNode);
-     *   4. JsonNode payloadNode = MAPPER.readTree(payload);
-     *   5. Set<ValidationMessage> errors = schema.validate(payloadNode);
-     *   6. If errors is not empty, format them nicely and throw ValidationException.
      */
     public static void validate(String payload, Path schemaFile) throws IOException, ValidationException {
-        throw new UnsupportedOperationException("Not yet implemented");
+        JsonNode schemaNode = MAPPER.readTree(Files.readString(schemaFile));
+
+        JsonSchemaFactory factory = JsonSchemaFactory.getInstance(SpecVersion.VersionFlag.V202012);
+        JsonSchema schema = factory.getSchema(schemaNode);
+
+        JsonNode payloadNode = MAPPER.readTree(payload);
+        Set<ValidationMessage> errors = schema.validate(payloadNode);
+
+        if (!errors.isEmpty()) {
+            throw new ValidationException(errors);
+        }
     }
 
     /**

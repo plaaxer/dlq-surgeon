@@ -44,13 +44,10 @@ class SchemaValidatorTest {
         Path schema = tmp.resolve("schema.json");
         Files.writeString(schema, SIMPLE_SCHEMA);
 
-        // TODO: Remove assertThrows wrapper once validate() is implemented.
-        //       Replace with: assertDoesNotThrow(() -> SchemaValidator.validate(payload, schema));
         String validPayload = """
                 {"orderId": 42, "currencyCode": "USD"}
                 """;
-        assertThrows(UnsupportedOperationException.class,
-                () -> SchemaValidator.validate(validPayload, schema));
+        assertDoesNotThrow(() -> SchemaValidator.validate(validPayload, schema));
     }
 
     @Test
@@ -58,14 +55,11 @@ class SchemaValidatorTest {
         Path schema = tmp.resolve("schema.json");
         Files.writeString(schema, SIMPLE_SCHEMA);
 
-        // TODO: Remove assertThrows(UnsupportedOperationException) wrapper once implemented.
-        //       Replace with:
-        //         var ex = assertThrows(SchemaValidator.ValidationException.class, ...);
-        //         assertTrue(ex.getErrors().stream().anyMatch(e -> e.getMessage().contains("currencyCode")));
         String invalidPayload = """
                 {"orderId": 42}
                 """;
-        assertThrows(UnsupportedOperationException.class,
+        var ex = assertThrows(SchemaValidator.ValidationException.class,
                 () -> SchemaValidator.validate(invalidPayload, schema));
+        assertTrue(ex.getErrors().stream().anyMatch(e -> e.getMessage().contains("currencyCode")));
     }
 }

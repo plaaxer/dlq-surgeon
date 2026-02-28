@@ -13,11 +13,12 @@ import static org.junit.jupiter.api.Assertions.*;
  * TODO: Add tests once RepairPlan.from() is implemented.
  *
  * Suggested test cases:
- *  - from() uses x-death exchange/routing-key when no overrides are given.
+ *  - from() defaults to empty exchange and x-death queue as routing key.
  *  - from() applies targetExchangeOverride when supplied.
+ *  - from() applies targetRoutingKeyOverride when supplied.
  *  - from() removes x-death headers when stripDeathHeaders=true.
  *  - from() preserves all other headers intact.
- *  - from() falls back to message exchange/routingKey when x-death is empty.
+ *  - from() falls back to message routing key when x-death is empty.
  *  - summary() output contains the correct queue, exchange, and routing-key values.
  */
 class RepairPlanTest {

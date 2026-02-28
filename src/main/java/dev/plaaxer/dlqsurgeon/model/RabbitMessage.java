@@ -71,16 +71,24 @@ public record RabbitMessage(
      *
      * This is the target for re-injection unless the user overrides with --target-* flags.
      */
+    /**
+     * Returns the default re-injection exchange.
+     * Uses the default exchange ("") so the routing key is treated as a queue name directly,
+     * bypassing exchange routing. Override with --target-exchange if needed.
+     */
     public String originalExchange() {
-        if (xDeathEntries.isEmpty()) return exchange;
-        return xDeathEntries.getLast().exchange();
+        return "";
     }
 
+    /**
+     * Returns the queue the message died in as the default routing key.
+     * Combined with the default exchange (""), this publishes directly to that queue.
+     * Falls back to the message's own routing key if x-death is absent.
+     * Override with --target-routing-key if needed.
+     */
     public String originalRoutingKey() {
         if (xDeathEntries.isEmpty()) return routingKey;
-        // x-death stores routing-keys as a List<String>; take the first.
-        List<String> keys = xDeathEntries.getLast().routingKeys();
-        return keys.isEmpty() ? routingKey : keys.getFirst();
+        return xDeathEntries.getLast().queue();
     }
 
     @SuppressWarnings("unchecked")
