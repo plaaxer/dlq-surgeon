@@ -1,5 +1,6 @@
 package dev.plaaxer.dlqsurgeon.model;
 
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 
@@ -28,13 +29,6 @@ public record RepairPlan(
 
     /**
      * Factory method that constructs a RepairPlan from a fetched message and user overrides.
-     *
-     * TODO: Implement.
-     *   - Use message.originalExchange() / message.originalRoutingKey() as defaults.
-     *   - Apply targetExchangeOverride / targetRoutingKeyOverride if non-null.
-     *   - Deep-copy message.headers() into a mutable map for properties.
-     *   - If stripDeathHeaders is true, remove "x-death", "x-first-death-exchange",
-     *     "x-first-death-queue", and "x-first-death-reason" keys from the headers copy.
      */
     public static RepairPlan from(
             RabbitMessage message,
@@ -43,7 +37,19 @@ public record RepairPlan(
             String targetRoutingKeyOverride,
             boolean stripDeathHeaders
     ) {
-        throw new UnsupportedOperationException("Not yet implemented");
+        Map<String, Object> props = new LinkedHashMap<>(message.headers());
+        if (stripDeathHeaders) {
+            props.keySet().removeIf(k -> k.equals("x-death") || k.startsWith("x-first-death-"));
+        }
+
+        return new RepairPlan(
+                targetExchangeOverride != null ? targetExchangeOverride : message.originalExchange(),
+                targetRoutingKeyOverride != null ? targetRoutingKeyOverride : message.originalRoutingKey(),
+                editedPayload,
+                props,
+                message.sourceQueue(),
+                stripDeathHeaders
+        );
     }
 
     /**

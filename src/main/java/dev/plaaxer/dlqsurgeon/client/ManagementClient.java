@@ -93,7 +93,7 @@ public class ManagementClient {
 
         List<RabbitMessage> result = new ArrayList<>(raw.size());
         for (int i = 0; i < raw.size(); i++) {
-            result.add(RabbitMessage.from(raw.get(i), i + 1));
+            result.add(RabbitMessage.from(raw.get(i), i + 1, queueName));
         }
         return result;
     }

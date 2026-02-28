@@ -15,16 +15,25 @@ import java.util.Map;
  *
  * Fields mirror the shape returned by the Management API /get endpoint.
  *
+ * Naming convention:
+ *   exchange / routingKey   — current envelope as fetched (e.g. the DLX exchange and its routing key).
+ *   originalExchange /
+ *   originalRoutingKey      — where the message last died, read from the most recent x-death entry.
+ *                             These are the re-injection defaults unless overridden by the user.
+ *   sourceQueue             — the queue this message was fetched from (needed to delete it after re-injection).
+ *   isDead()                — true if the message has any x-death entries.
+ *
  * TODO: If you add binary (non-JSON) payload support, store rawPayloadBytes
  *       separately and decode lazily only when the editor is opened.
  *
  * @param messageNumber    1-based index within the current fetch batch (for display).
- * @param exchange         Exchange the message was originally published to.
- * @param routingKey       Routing key the message was originally published with.
+ * @param exchange         Exchange the message arrived at as part of dead-lettering (e.g. the DLX).
+ * @param routingKey       Routing key used when the message was dead-lettered into this exchange.
+ * @param sourceQueue      The queue this message was fetched from.
  * @param payload          Message body as a UTF-8 string (decoded from base64 if needed).
  * @param contentType      MIME type from properties (may be null).
  * @param headers          Raw AMQP headers map, including x-death entries.
- * @param xDeathEntries    Parsed x-death header entries in chronological order; empty for non-DLQ messages.
+ * @param xDeathEntries    Parsed x-death entries, reverse-chronological (index 0 = most recent death).
  * @param deliveryMode     1 = non-persistent, 2 = persistent.
  * @param correlationId    Correlation ID from properties (may be null).
  * @param messageId        Message ID from properties (may be null).
@@ -34,6 +43,7 @@ public record RabbitMessage(
         int messageNumber,
         String exchange,
         String routingKey,
+        String sourceQueue,
         String payload,
         String contentType,
         Map<String, Object> headers,
@@ -55,44 +65,44 @@ public record RabbitMessage(
         String reason = "";
         String time = "";
         if (!xDeathEntries.isEmpty()) {
-            XDeathEntry last = xDeathEntries.getLast();
-            reason = last.reason();
-            if (last.time() > 0) {
-                time = LABEL_FMT.format(Instant.ofEpochSecond(last.time()));
+            XDeathEntry latest = xDeathEntries.getFirst();
+            reason = latest.reason();
+            if (latest.time() > 0) {
+                time = LABEL_FMT.format(Instant.ofEpochSecond(latest.time()));
             }
         }
         return String.format("#%-3d %-30s → %-25s %-10s %s",
                 messageNumber, routingKey, exchange, reason, time);
     }
 
-    /**
-     * Returns the original exchange and routing key from the most recent x-death entry.
-     * Falls back to the message's own exchange/routingKey if x-death is absent.
-     *
-     * This is the target for re-injection unless the user overrides with --target-* flags.
-     */
-    /**
-     * Returns the default re-injection exchange.
-     * Uses the default exchange ("") so the routing key is treated as a queue name directly,
-     * bypassing exchange routing. Override with --target-exchange if needed.
-     */
-    public String originalExchange() {
-        return "";
+    /** True if this message has at least one x-death entry. */
+    public boolean isDead() {
+        return !xDeathEntries.isEmpty();
     }
 
     /**
-     * Returns the queue the message died in as the default routing key.
-     * Combined with the default exchange (""), this publishes directly to that queue.
-     * Falls back to the message's own routing key if x-death is absent.
-     * Override with --target-routing-key if needed.
+     * The exchange the message was originally published to before it died (from x-death).
+     * Falls back to the current envelope exchange if x-death is absent.
+     * Default re-injection target unless overridden with --target-exchange.
+     */
+    public String originalExchange() {
+        if (xDeathEntries.isEmpty()) return exchange;
+        return xDeathEntries.getFirst().exchange();
+    }
+
+    /**
+     * The routing key the message was originally published with before it died (from x-death).
+     * Falls back to the current envelope routing key if x-death is absent.
+     * Default re-injection routing key unless overridden with --target-routing-key.
      */
     public String originalRoutingKey() {
         if (xDeathEntries.isEmpty()) return routingKey;
-        return xDeathEntries.getLast().queue();
+        List<String> keys = xDeathEntries.getFirst().routingKeys();
+        return keys.isEmpty() ? routingKey : keys.get(0);
     }
 
     @SuppressWarnings("unchecked")
-    public static RabbitMessage from(Map<String, Object> raw, int messageNumber) {
+    public static RabbitMessage from(Map<String, Object> raw, int messageNumber, String sourceQueue) {
         String exchange = (String) raw.get("exchange");
         String routingKey = (String) raw.get("routing_key");
         boolean redelivered = Boolean.TRUE.equals(raw.get("redelivered"));
@@ -113,7 +123,7 @@ public record RabbitMessage(
                 ? ((List<Map<String, Object>>) xDeath).stream().map(XDeathEntry::from).toList()
                 : List.of();
 
-        return new RabbitMessage(messageNumber, exchange, routingKey, payload, contentType,
-                headers, xDeathEntries, deliveryMode, correlationId, messageId, redelivered);
+        return new RabbitMessage(messageNumber, exchange, routingKey, sourceQueue, payload,
+                contentType, headers, xDeathEntries, deliveryMode, correlationId, messageId, redelivered);
     }
 }
