@@ -40,7 +40,7 @@ public class ManagementClient {
     /**
      * Returns metadata for every queue in the vhost.
      * Queues with {@code x-dead-letter-exchange} in their arguments are flagged with {@code hasDlx=true},
-     * meaning dead messages from those queues are forwarded to another exchange — not that they are DLQs themselves.
+     * meaning dead messages from those queues are forwarded to another exchange - not that they are DLQs themselves.
      */
     public List<QueueInfo> listQueues() throws Exception {
         String body = http.get("/queues/" + encodedVhost());
@@ -61,23 +61,8 @@ public class ManagementClient {
     }
 
     /**
-     * TODO: Implement.
      * Fetches up to {@code count} messages from {@code queueName}.
      * Always sets requeue=true so messages are not permanently removed.
-     *
-     * POST /api/queues/{vhost}/{queue}/get
-     * Body: { "count": N, "ackmode": "ack_requeue_true", "encoding": "auto", "truncate": 50000 }
-     *
-     * The response is a JSON array; each element contains:
-     *   - payload        (string, possibly base64 if binary)
-     *   - payload_encoding ("string" | "base64")
-     *   - properties     (headers, content-type, delivery-mode, etc.)
-     *   - routing_key
-     *   - exchange
-     *   - redelivered
-     *   - message_count  (messages remaining after this fetch)
-     *
-     * Map each element to a DeadLetteredMessage, parsing x-death from properties.headers.
      */
     public List<RabbitMessage> fetchMessages(String queueName, int count) throws Exception {
         ObjectNode bodyNode = MAPPER.createObjectNode();

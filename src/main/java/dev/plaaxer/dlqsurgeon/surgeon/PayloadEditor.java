@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 
 /**
  * Opens the message payload in the user's preferred editor and returns the edited result.
@@ -44,29 +45,66 @@ public class PayloadEditor {
      * @return The content of the file after the editor exits.
      * @throws IOException          on file or process I/O errors.
      * @throws InterruptedException if the editor process is interrupted.
-     *
-     * TODO: Implement.
-     *   1. Path tmp = Files.createTempFile("dlq-surgeon-", ".json");
-     *   2. Pretty-print originalPayload into tmp (use MAPPER.readTree + writerWithDefaultPrettyPrinter).
-     *      If the payload is not valid JSON, write it as-is (don't block the user from editing it).
-     *   3. String editor = resolveEditor();
-     *   4. new ProcessBuilder(editor, tmp.toString())
-     *          .inheritIO()
-     *          .start()
-     *          .waitFor();
-     *   5. return Files.readString(tmp);
-     *   6. In finally: Files.deleteIfExists(tmp);
      */
     public String edit(String originalPayload) throws IOException, InterruptedException {
-        throw new UnsupportedOperationException("Not yet implemented");
+        Path tmp = Files.createTempFile("dlq-surgeon-", ".json");
+        try {
+            String prettyPayload;
+            try {
+                prettyPayload = MAPPER.writerWithDefaultPrettyPrinter()
+                        .writeValueAsString(MAPPER.readTree(originalPayload));
+            } catch (Exception e) {
+                prettyPayload = originalPayload; // not valid JSON — write as-is
+            }
+            Files.writeString(tmp, prettyPayload);
+
+            String editor = resolveEditor();
+            int exitCode = new ProcessBuilder(editor, tmp.toString())
+                    .inheritIO()
+                    .start()
+                    .waitFor();
+            if (exitCode != 0) {
+                throw new IOException("Editor exited with code " + exitCode);
+            }
+
+            return Files.readString(tmp);
+        } finally {
+            Files.deleteIfExists(tmp);
+        }
     }
 
     /**
-     * TODO: Implement.
+     * Resolves the editor to use by trying candidates in order and returning
+     * the first one found on PATH.
+     *
      * Resolution order: $VISUAL → $EDITOR → "nano" → "vi" → "notepad" (Windows fallback).
-     * Throw a descriptive exception if none is found on PATH.
+     * Throws if none is available.
      */
     private String resolveEditor() {
-        throw new UnsupportedOperationException("Not yet implemented");
+        List<String> candidates = new java.util.ArrayList<>();
+
+        String visual = System.getenv("VISUAL");
+        if (visual != null && !visual.isBlank()) candidates.add(visual);
+
+        String editor = System.getenv("EDITOR");
+        if (editor != null && !editor.isBlank()) candidates.add(editor);
+
+        candidates.addAll(List.of("nano", "vi", "notepad"));
+
+        for (String candidate : candidates) {
+            // Use `which`/`where` to probe PATH without launching the editor itself.
+            String probe = System.getProperty("os.name", "").toLowerCase().contains("win")
+                    ? "where" : "which";
+            try {
+                int result = new ProcessBuilder(probe, candidate)
+                        .redirectErrorStream(true)
+                        .start()
+                        .waitFor();
+                if (result == 0) return candidate;
+            } catch (Exception ignored) {}
+        }
+
+        throw new IllegalStateException(
+                "No editor found. Set $VISUAL or $EDITOR, or install nano/vi.");
     }
 }
