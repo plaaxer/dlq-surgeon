@@ -11,8 +11,11 @@ import java.util.Map;
  *
  * Documented at: https://www.rabbitmq.com/docs/dlx#effects-on-messages
  *
- * @param exchange    The exchange the message was dead-lettered from.
- * @param routingKeys The routing keys the message was dead-lettered with.
+ * @param exchange    The exchange the message was originally published to before it was routed
+ *                    into the queue where it died. This is the source exchange, NOT the
+ *                    dead-letter exchange. This is the correct re-injection target.
+ * @param routingKeys The routing keys used when the message was originally published to
+ *                    {@code exchange}. Use the first entry as the re-injection routing key.
  * @param queue       The queue the message was dead-lettered from.
  * @param reason      Why the message was dead-lettered: "rejected", "expired", "maxlen",
  *                    "delivery-limit" (quorum queues), or "expired" (TTL).

@@ -36,6 +36,7 @@ class RepairPlanTest {
                 1,
                 "orders.dead",          // exchange (the DLX)
                 "orders.created",
+                "orders.dlq",           // sourceQueue
                 "{\"orderId\": 42}",
                 "application/json",
                 Map.of(

@@ -21,10 +21,6 @@ import java.util.List;
  * If a schemaFile was provided, validate after reading back. If validation fails,
  * offer the user a choice: re-open the editor, skip validation, or abort.
  *
- * TODO: For the native binary, ensure the editor path is resolved from the user's
- *       actual PATH rather than a hardcoded list. ProcessBuilder inherits the
- *       environment by default, so this should work out of the box.
- *
  * TODO: Consider adding a diff view after editing (show original vs edited)
  *       before the confirmation prompt in FixCommand.
  */

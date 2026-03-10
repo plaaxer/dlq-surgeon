@@ -1,5 +1,7 @@
 package dev.plaaxer.dlqsurgeon.model;
 
+import com.rabbitmq.client.AMQP;
+
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -13,16 +15,17 @@ import java.util.Map;
  * @param targetExchange     Exchange to publish to (from x-death or user override).
  * @param targetRoutingKey   Routing key to use (from x-death or user override).
  * @param editedPayload      The new message body, post-editor and post-validation.
- * @param properties         Full AMQP basic properties to preserve (content-type,
- *                           delivery-mode, correlation-id, message-id, headers, etc.).
+ * @param properties         AMQP basic properties ready for channel.basicPublish() —
+ *                           preserves content-type, delivery-mode, correlation-id,
+ *                           message-id, and headers from the original message.
  * @param sourceQueue        The DLQ the message will be deleted from after successful publish.
- * @param stripDeathHeaders  Whether to remove x-death and x-first-death-* before publishing.
+ * @param stripDeathHeaders  Whether x-death and x-first-death-* were stripped from headers.
  */
 public record RepairPlan(
         String targetExchange,
         String targetRoutingKey,
         String editedPayload,
-        Map<String, Object> properties,
+        AMQP.BasicProperties properties,
         String sourceQueue,
         boolean stripDeathHeaders
 ) {
@@ -37,16 +40,24 @@ public record RepairPlan(
             String targetRoutingKeyOverride,
             boolean stripDeathHeaders
     ) {
-        Map<String, Object> props = new LinkedHashMap<>(message.headers());
+        Map<String, Object> headers = new LinkedHashMap<>(message.headers());
         if (stripDeathHeaders) {
-            props.keySet().removeIf(k -> k.equals("x-death") || k.startsWith("x-first-death-"));
+            headers.keySet().removeIf(k -> k.equals("x-death") || k.startsWith("x-first-death-"));
         }
+
+        AMQP.BasicProperties properties = new AMQP.BasicProperties.Builder()
+                .contentType(message.contentType())
+                .deliveryMode(message.deliveryMode())
+                .correlationId(message.correlationId())
+                .messageId(message.messageId())
+                .headers(headers)
+                .build();
 
         return new RepairPlan(
                 targetExchangeOverride != null ? targetExchangeOverride : message.originalExchange(),
                 targetRoutingKeyOverride != null ? targetRoutingKeyOverride : message.originalRoutingKey(),
                 editedPayload,
-                props,
+                properties,
                 message.sourceQueue(),
                 stripDeathHeaders
         );

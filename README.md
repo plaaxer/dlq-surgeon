@@ -116,13 +116,15 @@ src/main/java/dev/plaaxer/dlqsurgeon/
 │   └── FixCommand.java              `dlq-surgeon fix`   — the surgical repair workflow
 │
 ├── client/
+│   ├── ApiHttpClient.java           Thin HTTP client wrapper (auth, error handling)
 │   ├── ManagementClient.java        RabbitMQ Management HTTP API (message fetch, queue info)
-│   └── AmqpPublisher.java           AMQP re-publish with publisher confirms
+│   └── AmqpPublisher.java           AMQP re-publish with publisher confirms + DLQ ack-delete
 │
 ├── model/
-│   ├── DeadLetteredMessage.java     In-memory snapshot of a fetched DLQ message
+│   ├── RabbitMessage.java           In-memory snapshot of a fetched DLQ message
 │   ├── XDeathEntry.java             Parsed x-death header entry
-│   └── RepairPlan.java              Immutable plan: what to publish where, shown before confirm
+│   ├── QueueInfo.java               Queue metadata (name, message count, DLX flag)
+│   └── RepairPlan.java              Immutable plan: target exchange/key + AMQP properties, shown before confirm
 │
 ├── surgeon/
 │   ├── MessageFetcher.java          Orchestrates fetching via ManagementClient
@@ -137,34 +139,17 @@ src/main/java/dev/plaaxer/dlqsurgeon/
 
 ---
 
-## Implementation Roadmap
+## Re-injection Target: How x-death Is Used
 
-All files contain detailed `TODO` comments explaining exactly what to implement and why.
-Suggested order:
+When a message is dead-lettered, RabbitMQ **prepends** an entry to the `x-death` header array — so **index 0 is always the most recent death**. Each entry records:
 
-1. **`ManagementClient`** — `listQueues()` and `fetchMessages()`. Start here; everything else depends on it.
-   Test manually against a local RabbitMQ: `docker run -p 5672:5672 -p 15672:15672 rabbitmq:3-management`
+- `exchange` — the source exchange the message was originally published to (not the DLX)
+- `routing-keys` — the routing keys used at that time
+- `queue` — the queue where it died
+- `reason` — `rejected`, `expired`, `maxlen`, or `delivery-limit`
+- `count` — how many times it died in this queue/exchange combination
 
-2. **`DeadLetteredMessage` / `XDeathEntry`** — parse the raw JSON from the Management API into records.
-   The trickiest part is parsing `x-death` — it's a JSON array of objects with mixed types.
-
-3. **`RepairPlan.from()`** — extract original exchange/routing-key from x-death, apply user overrides.
-
-4. **`PayloadEditor`** — write to temp file, exec `$EDITOR`, read back. 20 lines of code.
-
-5. **`SchemaValidator.validate()`** — wrap networknt's library. Another ~30 lines.
-
-6. **`AmqpPublisher.publish()`** — build AMQP properties, publish, `waitForConfirmsOrDie()`.
-
-7. **`Reinjector.reinjectAndDelete()`** — the safety-critical step. Read the comments carefully.
-
-8. **Wire `FixCommand.call()`** — connect all the above pieces per the pseudocode in the TODO.
-
-9. **`ListCommand` / `PeekCommand`** — straightforward once ManagementClient is done.
-
-10. **`MessagePicker`** — the interactive TUI. Arrow-key navigation is optional for v1.
-
-11. **Native image** — run `mvn -Pnative package`, fix any reflection issues, ship.
+`fix` reads `x-death[0]` to determine where to re-inject. For a message that died twice in two different queues, the most recent queue's exchange and routing key are used. Use `--target-exchange` and `--target-routing-key` to override if needed.
 
 ---
 

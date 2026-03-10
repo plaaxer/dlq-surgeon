@@ -1,6 +1,7 @@
 package dev.plaaxer.dlqsurgeon.cli;
 
 import dev.plaaxer.dlqsurgeon.model.RabbitMessage;
+import dev.plaaxer.dlqsurgeon.model.RepairPlan;
 import dev.plaaxer.dlqsurgeon.surgeon.MessageFetcher;
 import dev.plaaxer.dlqsurgeon.surgeon.PayloadEditor;
 import dev.plaaxer.dlqsurgeon.surgeon.Reinjector;
@@ -12,8 +13,11 @@ import picocli.CommandLine.Mixin;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.Parameters;
 
+import java.io.IOException;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.concurrent.Callable;
+import java.util.concurrent.TimeoutException;
 
 /**
  * `dlq-surgeon fix QUEUE`
@@ -92,45 +96,72 @@ public class FixCommand implements Callable<Integer> {
 
     @Override
     public Integer call() throws Exception {
-        // TODO: Implement this method. Suggested step-by-step:
-        //
-        //  Step 1 — Fetch messages
-        //    MessageFetcher fetcher = new MessageFetcher(connect);
-        //    List<RabbitMessage> messages = fetcher.fetch(queueName, count);
-        //    if (messages.isEmpty()) { Console.warn("Queue is empty."); return 0; }
-        //
-        //  Step 2 — Let user pick a message
-        //    RabbitMessage selected = MessagePicker.pick(messages);
-        //    if (selected == null) return 0; // user quit
-        //
-        //  Step 3 — Open editor
-        //    PayloadEditor editor = new PayloadEditor(schemaFile);
-        //    String editedPayload = editor.edit(selected.payload());
-        //    // PayloadEditor writes payload to a temp file, opens $EDITOR, reads back the result.
-        //
-        //  Step 4 — Validate (if schema provided)
-        //    if (schemaFile != null) {
-        //        SchemaValidator.validate(editedPayload, schemaFile); // throws on failure
-        //    }
-        //
-        //  Step 5 — Build and confirm RepairPlan
-        //    RepairPlan plan = RepairPlan.from(selected, editedPayload,
-        //                                      targetExchange, targetRoutingKey, stripDeathHeaders);
-        //    Console.printPlan(plan);
-        //    if (!autoConfirm && !Console.confirm("Proceed?")) return 0;
-        //
-        //  Step 6 — Re-inject then delete
-        //    Reinjector reinjector = new Reinjector(connect);
-        //    reinjector.reinjectAndDelete(plan, selected);
-        //    Console.success("Message repaired and re-injected.");
-        //    return 0;
-        //
-        //  Catch exceptions and return non-zero exit codes for scripting.
-        //
-        //  See: MessageFetcher, MessagePicker, PayloadEditor, SchemaValidator,
-        //       RepairPlan, Reinjector, Console
 
-        Console.info("fix command — not yet implemented");
+        if (connect.readOnly) {
+            Console.error("Cannot run 'fix' in --read-only mode.");
+            return 1;
+        }
+
+        MessageFetcher fetcher = new MessageFetcher(connect);
+        List<RabbitMessage> messages;
+        try {
+            messages = fetcher.fetch(queueName, count);
+        } catch (Exception e) {
+            Console.error("Failed to fetch messages from '" + queueName + "': " + e.getMessage());
+            return 1;
+        }
+        if (messages.isEmpty()) {
+            Console.warn("Queue '" + queueName + "' is empty.");
+            return 0;
+        }
+
+        RabbitMessage selected = MessagePicker.pick(messages);
+        if (selected == null) return 0; // user quit
+
+        PayloadEditor editor = new PayloadEditor(schemaFile);
+        String editedPayload = editor.edit(selected.payload());
+
+        while (schemaFile != null) {
+            try {
+                SchemaValidator.validate(editedPayload, schemaFile);
+                break; // valid — proceed
+            } catch (SchemaValidator.ValidationException e) {
+                Console.error("Validation failed:\n" + e.formatErrors());
+                String choice = promptValidationChoice();
+                if ("e".equals(choice)) {
+                    editedPayload = editor.edit(editedPayload);
+                } else if ("s".equals(choice)) {
+                    Console.warn("Skipping schema validation.");
+                    break;
+                } else {
+                    Console.info("Aborted.");
+                    return 0;
+                }
+            }
+        }
+
+        RepairPlan plan = RepairPlan.from(selected, editedPayload, targetExchange, targetRoutingKey, stripDeathHeaders);
+        Console.printPlan(plan.summary());
+        if (!autoConfirm && !Console.confirm("Proceed with re-injection?")) return 0;
+
+        try {
+            new Reinjector(connect).reinjectAndDelete(plan, selected);
+        } catch (TimeoutException e) {
+            Console.error("Timed out waiting for broker confirmation. The message was NOT re-injected and nothing was deleted from the DLQ.");
+            return 1;
+        } catch (IOException e) {
+            Console.error("Broker rejected the message: " + e.getMessage() + ". Nothing was deleted from the DLQ.");
+            return 1;
+        }
+
+        Console.success("Message repaired and re-injected successfully.");
         return 0;
+    }
+
+    private String promptValidationChoice() {
+        System.out.print("  [e] re-open editor  [s] skip validation  [a] abort: ");
+        String answer = System.console() != null ? System.console().readLine() : "a";
+        if (answer == null) return "a";
+        return answer.trim().toLowerCase();
     }
 }

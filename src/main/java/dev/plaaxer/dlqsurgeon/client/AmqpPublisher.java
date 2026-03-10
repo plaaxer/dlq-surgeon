@@ -4,11 +4,14 @@ import com.rabbitmq.client.AMQP;
 import com.rabbitmq.client.Channel;
 import com.rabbitmq.client.Connection;
 import com.rabbitmq.client.ConnectionFactory;
+import com.rabbitmq.client.GetResponse;
 import dev.plaaxer.dlqsurgeon.cli.ConnectOptions;
+import dev.plaaxer.dlqsurgeon.model.RabbitMessage;
 import dev.plaaxer.dlqsurgeon.model.RepairPlan;
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.concurrent.TimeoutException;
 
 /**
@@ -42,7 +45,7 @@ public class AmqpPublisher implements Closeable {
         this.connection = factory.newConnection("dlq-surgeon");
         this.channel = connection.createChannel();
 
-        // Enable publisher confirms. waitForConfirmsOrDie() in publish() will block
+        // enable publisher confirms. waitForConfirmsOrDie() in publish() will block
         // until the broker acks the message. Only then do we allow deletion from DLQ.
         channel.confirmSelect();
     }
@@ -54,17 +57,45 @@ public class AmqpPublisher implements Closeable {
      * @param plan the repaired payload, target exchange, routing key, and properties.
      * @throws IOException      on AMQP channel errors.
      * @throws TimeoutException if the broker does not confirm within the timeout.
-     *
-     * TODO: Implement this method.
-     *   1. Build AMQP.BasicProperties from plan.properties() (preserve original headers,
-     *      content-type, delivery-mode, correlation-id, message-id, etc.).
-     *      If plan.stripDeathHeaders() is true, remove x-death and x-first-death-* keys.
-     *   2. Call channel.basicPublish(exchange, routingKey, properties, bodyBytes).
-     *   3. Call channel.waitForConfirmsOrDie(5_000) — throws if broker nacks or times out.
-     *      This is the safety gate: if it throws, the caller must NOT delete from DLQ.
      */
     public void publish(RepairPlan plan) throws IOException, InterruptedException, TimeoutException {
-        throw new UnsupportedOperationException("Not yet implemented");
+        byte[] body = plan.editedPayload().getBytes(StandardCharsets.UTF_8);
+        channel.basicPublish(plan.targetExchange(), plan.targetRoutingKey(), plan.properties(), body);
+        channel.waitForConfirmsOrDie(5_000);
+
+    }
+
+    /**
+     * Fetches the message at the head of {@code queue}, verifies it matches {@code source}
+     * by message-id (or payload if message-id is absent), then acks it to remove it from
+     * the queue. If the head message does not match, it is nacked back (requeued) and an
+     * exception is thrown — nothing is deleted.
+     *
+     * Must be called only after a successful publish confirm. Uses the same connection
+     * and channel as the publisher to avoid opening a second AMQP connection.
+     */
+    public void deleteFromDlq(String queue, RabbitMessage source) throws IOException {
+        GetResponse response = channel.basicGet(queue, false); // false = manual ack
+        if (response == null) {
+            throw new IOException(
+                    "Queue '" + queue + "' was empty when attempting to delete source message. " +
+                    "The re-injected message is in the broker, so manual cleanup of the DLQ may be needed.");
+        }
+
+        String fetchedMessageId = response.getProps().getMessageId();
+        String fetchedBody = new String(response.getBody(), StandardCharsets.UTF_8);
+
+        boolean idMatch = source.messageId() != null && source.messageId().equals(fetchedMessageId);
+        boolean bodyMatch = fetchedBody.equals(source.payload());
+
+        if (!idMatch && !bodyMatch) {
+            channel.basicNack(response.getEnvelope().getDeliveryTag(), false, true); // requeue
+            throw new IOException(
+                    "Message at head of '" + queue + "' does not match the source (different message-id/payload). " +
+                    "A new message may have arrived in the DLQ. The source message was NOT deleted - manual cleanup required.");
+        }
+
+        channel.basicAck(response.getEnvelope().getDeliveryTag(), false);
     }
 
     @Override
