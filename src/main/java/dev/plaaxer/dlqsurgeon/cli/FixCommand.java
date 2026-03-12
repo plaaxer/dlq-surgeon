@@ -25,19 +25,12 @@ import java.util.concurrent.TimeoutException;
  * The core surgical workflow:
  *   1. Fetch messages from the DLQ (held in memory only).
  *   2. User picks which message to repair.
- *   3. Payload opens in $EDITOR (or a built-in fallback editor).
+ *   3. Payload opens in $EDITOR.
  *   4. On save, payload is validated against JSON Schema (if --schema given).
  *   5. After confirmation, the repaired message is published to the original
  *      exchange+routing-key with all original headers preserved.
  *   6. Only after a publisher confirm is received is the source message deleted
  *      from the DLQ. If publish fails, nothing is deleted.
- *
- * Safety invariants:
- *   - Never delete from DLQ before confirming successful re-injection.
- *   - Never modify message metadata (x-death, message-id, correlation-id, etc.)
- *     unless the user explicitly passes --strip-death-headers.
- *   - Always print the RepairPlan and ask for confirmation before acting,
- *     unless --yes is passed.
  */
 @Command(
         name = "fix",

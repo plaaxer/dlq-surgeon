@@ -19,13 +19,6 @@ import java.util.concurrent.Callable;
  * Fetches messages from the DLQ and displays them — with x-death metadata,
  * failure reasons, original exchange/routing-key, and the full payload.
  *
- * This command is intentionally READ-ONLY: it never publishes or acks anything.
- * Use `fix` to make edits and re-inject.
- *
- * Key design note: The Management HTTP API /api/queues/.../get endpoint is used
- * here (not AMQP). This requires us to re-enqueue messages after fetching (the
- * API will ack them unless requeue=true is set). MessageFetcher handles this.
- *
  * TODO: Add --filter flag to grep payload content (jq-style path expression).
  * TODO: Add --output json|table flag.
  */

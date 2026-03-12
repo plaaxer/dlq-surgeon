@@ -103,7 +103,6 @@ public class AmqpPublisher implements Closeable {
         try {
             if (channel != null && channel.isOpen()) channel.close();
         } catch (TimeoutException ignored) {
-            // Suppress — we're tearing down.
         } finally {
             if (connection != null && connection.isOpen()) connection.close();
         }

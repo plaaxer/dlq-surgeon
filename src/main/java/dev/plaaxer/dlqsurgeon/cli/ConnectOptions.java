@@ -5,14 +5,22 @@ import picocli.CommandLine.Option;
 /**
  * Reusable connection options, injected into every subcommand via @Mixin.
  *
- * All flags here can also be sourced from environment variables as a fallback
- * (see the defaultValue expressions). This lets CI pipelines and Docker setups
- * avoid passing credentials on the command line.
- *
- * TODO: Add support for loading these from a ~/.dlq-surgeon/config.toml file
- *       so power users can define named connection profiles (e.g., --profile prod).
+ * Resolution order (highest to lowest priority):
+ *   1. CLI flag
+ *   2. ~/.dlq-surgeon/config.toml (profile selected with --profile)
+ *   3. Environment variable (RABBITMQ_HOST, RABBITMQ_USER, etc.)
+ *   4. Built-in default
  */
 public class ConnectOptions {
+
+    // ── Profile ──────────────────────────────────────────────────────────────
+
+    @Option(
+            names = {"--profile"},
+            description = "Config file profile to load from ~/.dlq-surgeon/config.toml (default: ${DEFAULT-VALUE}).",
+            defaultValue = "default"
+    )
+    public String profile;
 
     // ── Management HTTP API ──────────────────────────────────────────────────
 
@@ -75,10 +83,6 @@ public class ConnectOptions {
     )
     public boolean readOnly;
 
-    /**
-     * Returns a human-readable summary for use in confirmation prompts.
-     * Never includes the password.
-     */
     public String summary() {
         return String.format("amqp://%s@%s:%d/%s  (management: %d)",
                 user, host, amqpPort, vhost.equals("/") ? "%2F" : vhost, managementPort);

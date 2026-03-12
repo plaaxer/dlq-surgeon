@@ -12,9 +12,6 @@ import java.util.concurrent.Callable;
  *
  * Lists all DLQs visible to the authenticated user (or a single queue's stats).
  * Read-only: never fetches or acks any messages.
- *
- * Output columns: queue name | message count | consumer count | state
- *
  * TODO: Add --pattern flag (glob/regex) to filter queue names.
  * TODO: Add --sort flag (name | messages | consumers).
  * TODO: Support --output json for machine-readable output.

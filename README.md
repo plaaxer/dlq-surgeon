@@ -3,6 +3,8 @@
 > A sole-purpose sidecar scalpel for RabbitMQ Dead Letter Queues.
 > Fetch → edit → validate → re-inject. Stateless. No data loss.
 
+Distributed as a **GraalVM Native Image** — a single executable binary compiled ahead-of-time directly to machine code. No JRE required, no JVM warmup, ~50 ms startup. Drop it on a server and run it. Also available as a fat JAR for platforms without a matching binary.
+
 ---
 
 ## The Problem
@@ -50,7 +52,7 @@ gu install native-image
 ```bash
 # Fat JAR (fast iteration, no GraalVM needed)
 mvn package
-java -jar target/dlq-surgeon-*-fat.jar --help
+java -jar target/dlq-surgeon-fat.jar --help
 
 # Native binary (production, requires GraalVM)
 mvn -Pnative package
@@ -87,10 +89,11 @@ dlq-surgeon fix orders.dead \
 
 ## Connection Options
 
-All commands accept the same connection flags (can also be set via environment variables):
+Resolution order (highest to lowest priority): CLI flag → config file → env var → built-in default.
 
 | Flag | Env var | Default |
 |---|---|---|
+| `--profile` | — | `default` |
 | `--host` | `RABBITMQ_HOST` | `localhost` |
 | `--management-port` | `RABBITMQ_MANAGEMENT_PORT` | `15672` |
 | `--amqp-port` | `RABBITMQ_AMQP_PORT` | `5672` |
@@ -98,6 +101,37 @@ All commands accept the same connection flags (can also be set via environment v
 | `--user` | `RABBITMQ_USER` | `guest` |
 | `--password` | `RABBITMQ_PASSWORD` | `guest` |
 | `--read-only` | — | `false` |
+
+### Config file
+
+Create `~/.dlq-surgeon/config.toml` with named profiles:
+
+```toml
+[default]
+host     = "localhost"
+user     = "guest"
+password = "guest"
+
+[prod]
+host     = "rabbitmq.prod.internal"
+user     = "admin"
+password = "s3cr3t"
+vhost    = "orders"
+
+[staging]
+host     = "rabbitmq.staging.internal"
+user     = "admin"
+password = "stagingsecret"
+```
+
+Then just:
+
+```bash
+dlq-surgeon fix orders.dlq                    # uses [default]
+dlq-surgeon --profile prod fix orders.dlq     # uses [prod]
+```
+
+Any flag still passed explicitly on the CLI overrides the config file value.
 
 ---
 

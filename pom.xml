@@ -23,6 +23,7 @@
         <jackson.version>2.17.2</jackson.version>
         <json-schema-validator.version>1.5.2</json-schema-validator.version>
         <jline.version>3.26.3</jline.version>
+        <tomlj.version>1.1.1</tomlj.version>
         <slf4j.version>2.0.13</slf4j.version>
         <junit.version>5.11.0</junit.version>
         <mockito.version>5.12.0</mockito.version>
@@ -35,67 +36,36 @@
 
     <dependencies>
 
-        <!-- ─── CLI ──────────────────────────────────────────────────────── -->
-        <!--
-            Picocli handles argument parsing, subcommands, and help generation.
-            It has first-class GraalVM Native Image support via its annotation
-            processor (see maven-compiler-plugin config below), which auto-generates
-            reflect-config.json so you don't have to maintain it by hand.
-        -->
         <dependency>
             <groupId>info.picocli</groupId>
             <artifactId>picocli</artifactId>
             <version>${picocli.version}</version>
         </dependency>
 
-        <!-- ─── RabbitMQ ─────────────────────────────────────────────────── -->
-        <!--
-            Official Java AMQP client. Used *only* for publishing the repaired
-            message back to the original exchange (AmqpPublisher) and waiting for
-            publisher confirms before deleting the source message from the DLQ.
-
-            NOTE: Message *fetching* intentionally uses the HTTP Management API
-            (ManagementClient) via Java's built-in HttpClient — this lets us read
-            messages without consuming/acking them until the user explicitly commits.
-        -->
         <dependency>
             <groupId>com.rabbitmq</groupId>
             <artifactId>amqp-client</artifactId>
             <version>${rabbitmq-client.version}</version>
         </dependency>
 
-        <!-- ─── JSON ─────────────────────────────────────────────────────── -->
-        <!--
-            Jackson for serialising/deserialising payloads and Management API
-            responses. Create ObjectMapper once at startup and reuse — it is
-            expensive to construct but fully thread-safe after configuration.
-        -->
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-databind</artifactId>
             <version>${jackson.version}</version>
         </dependency>
 
-        <!-- ─── JSON Schema validation ───────────────────────────────────── -->
-        <!--
-            Validates the edited payload against a user-supplied JSON Schema before
-            re-injection. Supports Draft-04 through Draft-2020-12. The SchemaValidator
-            class wraps this library. Schema can be passed via the -schema flag or
-            discovered automatically by naming convention.
-        -->
         <dependency>
             <groupId>com.networknt</groupId>
             <artifactId>json-schema-validator</artifactId>
             <version>${json-schema-validator.version}</version>
         </dependency>
 
-        <!-- ─── Terminal UI ──────────────────────────────────────────────── -->
-        <!--
-            JLine 3 gives us: readline-style input, ANSI colour helpers, and the
-            interactive message-picker list (arrow keys + search). Much lighter than
-            a full TUI framework and has solid GraalVM support. Used in MessagePicker
-            and Console. Jansi provides native terminal width/height detection.
-        -->
+        <dependency>
+            <groupId>org.tomlj</groupId>
+            <artifactId>tomlj</artifactId>
+            <version>${tomlj.version}</version>
+        </dependency>
+
         <dependency>
             <groupId>org.jline</groupId>
             <artifactId>jline</artifactId>
@@ -107,13 +77,6 @@
             <version>${jline.version}</version>
         </dependency>
 
-        <!-- ─── Logging ──────────────────────────────────────────────────── -->
-        <!--
-            Minimal SLF4J + Simple binding for near-zero startup overhead in the
-            native binary. Tune verbosity via system property:
-              -Dorg.slf4j.simpleLogger.defaultLogLevel=debug
-            Replace with Logback if you need structured/JSON logging later.
-        -->
         <dependency>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-simple</artifactId>
@@ -147,14 +110,6 @@
 
     <build>
         <plugins>
-
-            <!-- ─── Compiler ─────────────────────────────────────────────── -->
-            <!--
-                The picocli-codegen annotation processor runs at compile time and
-                generates GraalVM metadata (reflect-config.json, resource-config.json)
-                into target/classes/META-INF/native-image/. The native-maven-plugin
-                picks these up automatically — no manual maintenance needed.
-            -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
@@ -182,7 +137,7 @@
 
             <!-- ─── Fat JAR (for local dev, no GraalVM required) ─────────── -->
             <!--
-                `mvn package` → target/dlq-surgeon-<version>-fat.jar
+                mvn package → target/dlq-surgeon-<version>-fat.jar
                 Run with: java -jar target/dlq-surgeon-*-fat.jar fix my-dlq
                 Use the -Pnative profile for the production single binary.
             -->
@@ -199,11 +154,11 @@
                         <configuration>
                             <shadedArtifactAttached>true</shadedArtifactAttached>
                             <shadedClassifierName>fat</shadedClassifierName>
+                            <finalName>dlq-surgeon</finalName>
                             <transformers>
                                 <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
                                     <mainClass>${main-class}</mainClass>
                                 </transformer>
-                                <!-- Merge duplicate SPI service files (Jackson modules, JLine, etc.) -->
                                 <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
                             </transformers>
                             <filters>
@@ -255,17 +210,6 @@
                             <imageName>dlq-surgeon</imageName>
                             <mainClass>${main-class}</mainClass>
                             <buildArgs>
-                                <!--
-                                    no-fallback: fail build if reflection metadata is missing
-                                                 (never produce a silent JVM-fallback binary)
-                                    O2: optimise for binary size + startup speed
-                                    install-exit-handlers: proper SIGTERM/SIGINT handling
-                                    H:+ReportExceptionStackTraces: full traces in native exceptions
-
-                                    If you hit "class not found at runtime" errors, add:
-                                    trace-class-initialization=com.example.YourClass
-                                    and adjust reflect-config.json or add @RegisterForReflection.
-                                -->
                                 <buildArg>--no-fallback</buildArg>
                                 <buildArg>-O2</buildArg>
                                 <buildArg>--install-exit-handlers</buildArg>
