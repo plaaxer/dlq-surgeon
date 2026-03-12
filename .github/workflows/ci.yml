@@ -27,7 +27,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: dlq-surgeon-fat
-          path: target/dlq-surgeon-*-fat.jar
+          path: target/dlq-surgeon-fat.jar
           retention-days: 7
 
   release:
@@ -41,18 +41,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up JDK 21
+      - name: Set up GraalVM 21
         uses: actions/setup-java@v4
         with:
           java-version: '21'
-          distribution: 'temurin'
+          distribution: 'graalvm'
           cache: maven
 
-      - name: Build fat JAR
-        run: mvn package -DskipTests --no-transfer-progress
+      - name: Build native binary and fat JAR
+        run: mvn -Pnative package -DskipTests --no-transfer-progress
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: target/dlq-surgeon-*-fat.jar
+          files: |
+            target/dlq-surgeon
+            target/dlq-surgeon-fat.jar
           generate_release_notes: true
