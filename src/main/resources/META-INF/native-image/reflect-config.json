@@ -1,12 +1,1 @@
-[
-  {
-    "comment": "This file is a starting point. The picocli-codegen annotation processor",
-    "comment2": "auto-generates most of the necessary entries at compile time and merges",
-    "comment3": "them into this directory. Add entries here ONLY for classes that are",
-    "comment4": "accessed via reflection but not picked up automatically (e.g. Jackson",
-    "comment5": "deserialization targets, SPI implementations loaded by ServiceLoader).",
-    "comment6": "To discover missing entries: run the native binary with the tracing agent:",
-    "comment7": "  java -agentlib:native-image-agent=config-output-dir=src/main/resources/META-INF/native-image \\",
-    "comment8": "       -jar target/dlq-surgeon-*-fat.jar fix my-dlq"
-  }
-]
+[]

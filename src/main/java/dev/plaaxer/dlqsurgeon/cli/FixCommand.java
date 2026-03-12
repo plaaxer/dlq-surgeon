@@ -89,6 +89,7 @@ public class FixCommand implements Callable<Integer> {
 
     @Override
     public Integer call() throws Exception {
+        connect.printConnectionInfo();
 
         if (connect.readOnly) {
             Console.error("Cannot run 'fix' in --read-only mode.");

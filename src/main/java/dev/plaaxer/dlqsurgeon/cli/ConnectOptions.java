@@ -1,6 +1,12 @@
 package dev.plaaxer.dlqsurgeon.cli;
 
+import dev.plaaxer.dlqsurgeon.tui.Console;
+import picocli.CommandLine.Model.CommandSpec;
 import picocli.CommandLine.Option;
+import picocli.CommandLine.Spec;
+
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Reusable connection options, injected into every subcommand via @Mixin.
@@ -12,6 +18,9 @@ import picocli.CommandLine.Option;
  *   4. Built-in default
  */
 public class ConnectOptions {
+
+    @Spec(Spec.Target.MIXEE)
+    CommandSpec spec;
 
     // ── Profile ──────────────────────────────────────────────────────────────
 
@@ -82,6 +91,31 @@ public class ConnectOptions {
             defaultValue = "false"
     )
     public boolean readOnly;
+
+    /**
+     * Prints the active connection target and warns about any options that were
+     * not explicitly set on the CLI (defaults).
+     */
+    public void printConnectionInfo() {
+        Console.dim("Connecting to: " + summary());
+
+        List<String> defaulted = new ArrayList<>();
+        var parseResult = spec.commandLine().getParseResult();
+        for (String opt : List.of("--host", "--user", "--password")) {
+            if (!parseResult.hasMatchedOption(opt)) {
+                defaulted.add(opt);
+            }
+        }
+
+        if (!defaulted.isEmpty()) {
+            Console.warn("Using default value for: " + String.join(", ", defaulted)
+                    + ". Set via CLI flag, ~/.dlq-surgeon/config.toml, or env var.");
+        }
+
+        if ("default".equals(profile) && !parseResult.hasMatchedOption("--profile")) {
+            Console.warn("Using [default] config profile. Pass --profile <name> to use a named profile.");
+        }
+    }
 
     public String summary() {
         return String.format("amqp://%s@%s:%d/%s  (management: %d)",

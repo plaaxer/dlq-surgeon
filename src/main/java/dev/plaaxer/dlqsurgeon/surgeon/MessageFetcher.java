@@ -20,12 +20,8 @@ import java.util.Map;
  * and formatting results to the console.
  *
  * Design contract:
- *   - Messages are fetched via the Management HTTP API with requeue=true.
+ *   - Messages are fetched via the Management HTTP API with requeue=true (that's the intended design).
  *     They are NOT consumed in the AMQP sense; they return to the queue immediately.
- *   - Messages are never written to disk — only to the tmp file opened by PayloadEditor,
- *     which is cleaned up after the editor exits.
- *
- * Thread safety: Not thread-safe. Use one instance per command invocation.
  */
 public class MessageFetcher {
 

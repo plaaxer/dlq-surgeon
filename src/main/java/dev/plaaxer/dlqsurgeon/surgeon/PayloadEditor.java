@@ -10,18 +10,7 @@ import java.util.List;
 /**
  * Opens the message payload in the user's preferred editor and returns the edited result.
  *
- * Strategy (same as git commit -m):
- *   1. Pretty-print the payload to a temp file in /tmp/dlq-surgeon-*.json.
- *   2. Resolve the editor: $VISUAL → $EDITOR → "nano" → "vi" (first found on PATH).
- *   3. exec() the editor process, inheriting stdin/stdout/stderr so the user gets
- *      a full interactive session.
- *   4. After the editor exits, read the file back and return the content.
- *   5. Delete the temp file in a finally block.
- *
- * If a schemaFile was provided, validate after reading back. If validation fails,
- * offer the user a choice: re-open the editor, skip validation, or abort.
- *
- * TODO: Consider adding a diff view after editing (show original vs edited)
+ * TODO: adding a diff view after editing (show original vs edited)
  *       before the confirmation prompt in FixCommand.
  */
 public class PayloadEditor {
@@ -73,7 +62,7 @@ public class PayloadEditor {
      * Resolves the editor to use by trying candidates in order and returning
      * the first one found on PATH.
      *
-     * Resolution order: $VISUAL → $EDITOR → "nano" → "vi" → "notepad" (Windows fallback).
+     * Resolution order: $VISUAL → $EDITOR → "nano" → "vi" → "notepad".
      * Throws if none is available.
      */
     private String resolveEditor() {

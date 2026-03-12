@@ -23,11 +23,6 @@ import java.util.Map;
  *                    this message.
  * @param time        Epoch milliseconds when the message was dead-lettered
  *                    (stored as long from the AMQP timestamp).
- *
- * TODO: Parse these from the raw headers map in ManagementClient.
- *       The x-death value is a List of Maps; each map has string keys and mixed values.
- *       Be careful: "time" comes as a java.util.Date from the AMQP client library,
- *       so convert it: ((Date) raw.get("time")).getTime().
  */
 public record XDeathEntry(
         String exchange,

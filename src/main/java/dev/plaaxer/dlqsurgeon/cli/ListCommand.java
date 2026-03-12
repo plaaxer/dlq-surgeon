@@ -36,6 +36,7 @@ public class ListCommand implements Callable<Integer> {
 
     @Override
     public Integer call() throws Exception {
+        connect.printConnectionInfo();
         MessageFetcher fetcher = new MessageFetcher(connect);
 
         if (queueName != null) {

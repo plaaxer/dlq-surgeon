@@ -44,6 +44,7 @@ public class PeekCommand implements Callable<Integer> {
 
     @Override
     public Integer call() throws Exception {
+        connect.printConnectionInfo();
         MessageFetcher fetcher = new MessageFetcher(connect);
         List<RabbitMessage> messages = fetcher.fetch(queueName, count);
 

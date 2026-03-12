@@ -22,10 +22,6 @@ import java.util.Map;
  *                             These are the re-injection defaults unless overridden by the user.
  *   sourceQueue             — the queue this message was fetched from (needed to delete it after re-injection).
  *   isDead()                — true if the message has any x-death entries.
- *
- * TODO: If you add binary (non-JSON) payload support, store rawPayloadBytes
- *       separately and decode lazily only when the editor is opened.
- *
  * @param messageNumber    1-based index within the current fetch batch (for display).
  * @param exchange         Exchange the message arrived at as part of dead-lettering (e.g. the DLX).
  * @param routingKey       Routing key used when the message was dead-lettered into this exchange.
