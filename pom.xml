@@ -27,12 +27,23 @@
         <slf4j.version>2.0.13</slf4j.version>
         <junit.version>5.11.0</junit.version>
         <mockito.version>5.12.0</mockito.version>
+        <testcontainers.version>1.20.1</testcontainers.version>
 
         <!-- Plugin versions -->
         <native-maven-plugin.version>0.10.3</native-maven-plugin.version>
         <maven-shade-plugin.version>3.6.0</maven-shade-plugin.version>
         <main-class>dev.plaaxer.dlqsurgeon.Main</main-class>
     </properties>
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>org.slf4j</groupId>
+                <artifactId>slf4j-api</artifactId>
+                <version>${slf4j.version}</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
 
     <dependencies>
 
@@ -96,15 +107,25 @@
             <version>${mockito.version}</version>
             <scope>test</scope>
         </dependency>
-        <!--
-            TODO: Add Testcontainers + RabbitMQ module for integration tests.
-              <dependency>
-                <groupId>org.testcontainers</groupId>
-                <artifactId>rabbitmq</artifactId>
-                <version>1.20.1</version>
-                <scope>test</scope>
-              </dependency>
-        -->
+        <!-- ─── Testcontainers ───────────────────────────────────────────── -->
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>testcontainers</artifactId>
+            <version>${testcontainers.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>rabbitmq</artifactId>
+            <version>${testcontainers.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>${testcontainers.version}</version>
+            <scope>test</scope>
+        </dependency>
 
     </dependencies>
 
