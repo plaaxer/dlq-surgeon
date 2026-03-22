@@ -14,9 +14,6 @@ import org.testcontainers.utility.DockerImageName;
  * keeping the test suite fast. Each test is responsible for cleaning up the
  * queues and exchanges it creates — use {@link #channel()} and close it in
  * a @AfterEach when you need a fresh AMQP channel.
- *
- * Usage: extend this class (no extra annotations needed — the container is
- * managed manually, not via @Testcontainers, to avoid one-container-per-class).
  */
 public abstract class RabbitContainerBase {
 

@@ -8,14 +8,13 @@ import dev.plaaxer.dlqsurgeon.model.RepairPlan;
 
 /**
  * Executes the surgical re-injection: publish the repaired message, then delete
- * the original from the DLQ — in that strict order, with no exceptions.
+ * the original from the DLQ.
  *
- * Safety invariant (NEVER VIOLATE):
+ * We guarantee that:
  *   The source message is deleted from the DLQ ONLY after a publisher confirm
- *   is received from the broker for the repaired message. If publishing fails
- *   or times out, this method must throw without deleting anything.
+ *   is received from the broker for the repaired message.
  *
- * TODO: For bulk repair, add a reinjectAndDeleteBatch() method that processes
+ * TODO: bulking support, something like a reinjectAndDeleteBatch() method that processes
  *       messages in order and reports partial success clearly.
  */
 public class Reinjector {
@@ -37,7 +36,7 @@ public class Reinjector {
     public void reinjectAndDelete(RepairPlan plan, RabbitMessage source) throws Exception {
         try (AmqpPublisher publisher = new AmqpPublisher(opts)) {
             publisher.publish(plan);
-            // Confirm received — safe to delete. Both operations share the same connection.
+            // Confirm received -> safe to delete. Both operations share the same connection.
             publisher.deleteFromDlq(plan.sourceQueue(), source);
         }
     }

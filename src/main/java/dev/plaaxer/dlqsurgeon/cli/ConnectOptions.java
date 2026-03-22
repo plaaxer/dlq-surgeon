@@ -78,10 +78,8 @@ public class ConnectOptions {
     public char[] password;
 
     // ── TLS / mTLS ──────────────────────────────────────────────────────────
-    // TODO: Add --tls, --tls-cert, --tls-key, --tls-ca options.
-    //       Use SSLContext with KeyManagerFactory + TrustManagerFactory.
-    //       Both ManagementClient (HttpClient) and AmqpPublisher (ConnectionFactory)
-    //       accept an SSLContext directly.
+    // TODO: add --tls, --tls-cert, --tls-key, --tls-ca options.
+    //       Can use SSLContext with KeyManagerFactory and TrustManagerFactory.
 
     // ── Safety ──────────────────────────────────────────────────────────────
 

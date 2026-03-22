@@ -95,12 +95,18 @@ public record RabbitMessage(
                 ? new String(Base64.getDecoder().decode(payloadRaw))
                 : payloadRaw;
 
-        Map<String, Object> properties = (Map<String, Object>) raw.getOrDefault("properties", Map.of());
+        Object propsRaw = raw.get("properties");
+        Map<String, Object> properties = propsRaw instanceof Map<?, ?> m
+                ? (Map<String, Object>) m
+                : Map.of();
         String contentType = (String) properties.get("content_type");
         int deliveryMode = ((Number) properties.getOrDefault("delivery_mode", 1)).intValue();
         String correlationId = (String) properties.get("correlation_id");
         String messageId = (String) properties.get("message_id");
-        Map<String, Object> headers = (Map<String, Object>) properties.getOrDefault("headers", Map.of());
+        Object headersRaw = properties.get("headers");
+        Map<String, Object> headers = headersRaw instanceof Map<?, ?> m
+                ? (Map<String, Object>) m
+                : Map.of();
 
         List<XDeathEntry> xDeathEntries = headers.get("x-death") instanceof List<?> xDeath
                 ? ((List<Map<String, Object>>) xDeath).stream().map(XDeathEntry::from).toList()

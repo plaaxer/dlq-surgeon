@@ -19,9 +19,8 @@ import java.util.Map;
  * Facade over ManagementClient for fetching queue and message data,
  * and formatting results to the console.
  *
- * Design contract:
- *   - Messages are fetched via the Management HTTP API with requeue=true (that's the intended design).
- *     They are NOT consumed in the AMQP sense; they return to the queue immediately.
+ * Messages are fetched via the Management HTTP API with requeue=true (that's the intended design).
+ * They are NOT consumed in the AMQP sense; they return to the queue immediately.
  */
 public class MessageFetcher {
 
