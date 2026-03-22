@@ -22,10 +22,8 @@ import java.util.concurrent.TimeoutException;
  *   and is "not recommended for production". AMQP with confirms gives us
  *   exactly-once delivery semantics before we delete the source message.
  *
- * Lifecycle: create → publish → close. Do not share across threads.
- *
- * TODO: Add support for mTLS by injecting an SSLContext into ConnectionFactory.
- * TODO: Consider a connection pool if bulk-repair of many messages is needed.
+ * TODO: could add support for mTLS by injecting an SSLContext into ConnectionFactory.
+ * TODO: connection pool for bulk-repair?
  */
 public class AmqpPublisher implements Closeable {
 
@@ -39,8 +37,6 @@ public class AmqpPublisher implements Closeable {
         factory.setVirtualHost(opts.vhost);
         factory.setUsername(opts.user);
         factory.setPassword(new String(opts.password));
-
-        // TODO: factory.useSslProtocol(sslContext)  when TLS opts are added.
 
         this.connection = factory.newConnection("dlq-surgeon");
         this.channel = connection.createChannel();
@@ -69,7 +65,7 @@ public class AmqpPublisher implements Closeable {
      * Fetches the message at the head of {@code queue}, verifies it matches {@code source}
      * by message-id (or payload if message-id is absent), then acks it to remove it from
      * the queue. If the head message does not match, it is nacked back (requeued) and an
-     * exception is thrown — nothing is deleted.
+     * exception is thrown (nothing is deleted).
      *
      * Must be called only after a successful publish confirm. Uses the same connection
      * and channel as the publisher to avoid opening a second AMQP connection.

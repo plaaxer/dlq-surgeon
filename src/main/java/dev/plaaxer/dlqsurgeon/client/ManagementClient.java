@@ -22,8 +22,8 @@ import java.util.Map;
  *
  * Reference: <a href="https://www.rabbitmq.com/docs/http-api-reference">...</a>
  *
- * TODO: Add TLS support by injecting an SSLContext into HttpClient.newBuilder().
- * TODO: Implement pagination for very large queue lists.
+ * TODO: TLS support by injecting an SSLContext into HttpClient.newBuilder().
+ * TODO: pagination for very large queue lists possibly
  */
 public class ManagementClient {
 

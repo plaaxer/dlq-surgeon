@@ -9,19 +9,6 @@ import java.util.Map;
 
 /**
  * Represents a single message fetched from a RabbitMQ queue via the Management API.
- *
- * This is an in-memory snapshot; the original message remains in the queue
- * (requeued by ManagementClient.fetchMessages) until the user commits a repair.
- *
- * Fields mirror the shape returned by the Management API /get endpoint.
- *
- * Naming convention:
- *   exchange / routingKey   — current envelope as fetched (e.g. the DLX exchange and its routing key).
- *   originalExchange /
- *   originalRoutingKey      — where the message last died, read from the most recent x-death entry.
- *                             These are the re-injection defaults unless overridden by the user.
- *   sourceQueue             — the queue this message was fetched from (needed to delete it after re-injection).
- *   isDead()                — true if the message has any x-death entries.
  * @param messageNumber    1-based index within the current fetch batch (for display).
  * @param exchange         Exchange the message arrived at as part of dead-lettering (e.g. the DLX).
  * @param routingKey       Routing key used when the message was dead-lettered into this exchange.
