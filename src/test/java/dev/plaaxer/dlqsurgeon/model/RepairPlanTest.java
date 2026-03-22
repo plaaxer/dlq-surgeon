@@ -2,6 +2,7 @@ package dev.plaaxer.dlqsurgeon.model;
 
 import org.junit.jupiter.api.Test;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -9,10 +10,6 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Unit tests for RepairPlan.
- *
- * TODO: Add tests once RepairPlan.from() is implemented.
- *
- * Suggested test cases:
  *  - from() defaults to empty exchange and x-death queue as routing key.
  *  - from() applies targetExchangeOverride when supplied.
  *  - from() applies targetRoutingKeyOverride when supplied.
@@ -32,6 +29,10 @@ class RepairPlanTest {
                 3L,
                 System.currentTimeMillis()
         );
+        Map<String, Object> headers = new HashMap<>();
+        headers.put("x-death", List.of(Map.of("exchange", "orders")));
+        headers.put("x-first-death-exchange", "orders");
+        headers.put("content-type", "application/json");
         return new RabbitMessage(
                 1,
                 "orders.dead",          // exchange (the DLX)
@@ -39,10 +40,7 @@ class RepairPlanTest {
                 "orders.dlq",           // sourceQueue
                 "{\"orderId\": 42}",
                 "application/json",
-                Map.of(
-                        "x-death", List.of(Map.of("exchange", "orders")),
-                        "x-first-death-exchange", "orders"
-                ),
+                headers,
                 List.of(death),
                 2,
                 "corr-123",
@@ -51,9 +49,81 @@ class RepairPlanTest {
         );
     }
 
+    private RabbitMessage messageWithoutXDeath() {
+        return new RabbitMessage(
+                1,
+                "payments.dlx",
+                "payments.retry",
+                "payments.dlq",
+                "{\"amount\": 99}",
+                "application/json",
+                new HashMap<>(),
+                List.of(),
+                2,
+                null,
+                null,
+                false
+        );
+    }
+
     @Test
-    void placeholderTest() {
-        // Remove this test once you implement RepairPlan.from() and add real tests above.
-        assertNotNull(sampleMessage());
+    void defaultsToXDeathExchangeAndRoutingKey() {
+        RepairPlan plan = RepairPlan.from(sampleMessage(), "{}", null, null, false);
+
+        assertEquals("orders", plan.targetExchange());
+        assertEquals("orders.created", plan.targetRoutingKey());
+    }
+
+    @Test
+    void appliesTargetExchangeOverride() {
+        RepairPlan plan = RepairPlan.from(sampleMessage(), "{}", "custom.exchange", null, false);
+
+        assertEquals("custom.exchange", plan.targetExchange());
+        assertEquals("orders.created", plan.targetRoutingKey()); // routing key unchanged
+    }
+
+    @Test
+    void appliesTargetRoutingKeyOverride() {
+        RepairPlan plan = RepairPlan.from(sampleMessage(), "{}", null, "custom.key", false);
+
+        assertEquals("orders", plan.targetExchange()); // exchange unchanged
+        assertEquals("custom.key", plan.targetRoutingKey());
+    }
+
+    @Test
+    void removesXDeathHeadersWhenStripEnabled() {
+        RepairPlan plan = RepairPlan.from(sampleMessage(), "{}", null, null, true);
+
+        Map<String, Object> headers = plan.properties().getHeaders();
+        assertFalse(headers.containsKey("x-death"), "x-death should be stripped");
+        assertFalse(headers.containsKey("x-first-death-exchange"), "x-first-death-exchange should be stripped");
+        assertTrue(plan.stripDeathHeaders());
+    }
+
+    @Test
+    void preservesOtherHeadersWhenStripping() {
+        RepairPlan plan = RepairPlan.from(sampleMessage(), "{}", null, null, true);
+
+        Map<String, Object> headers = plan.properties().getHeaders();
+        assertTrue(headers.containsKey("content-type"), "non-death headers must be preserved");
+    }
+
+    @Test
+    void fallsBackToEnvelopeWhenXDeathIsEmpty() {
+        RepairPlan plan = RepairPlan.from(messageWithoutXDeath(), "{}", null, null, false);
+
+        assertEquals("payments.dlx", plan.targetExchange());
+        assertEquals("payments.retry", plan.targetRoutingKey());
+    }
+
+    @Test
+    void summaryContainsQueueExchangeAndRoutingKey() {
+        RabbitMessage msg = sampleMessage();
+        RepairPlan plan = RepairPlan.from(msg, "{}", null, null, false);
+
+        String summary = plan.summary();
+        assertTrue(summary.contains("orders.dlq"), "summary should contain source queue");
+        assertTrue(summary.contains("orders"), "summary should contain target exchange");
+        assertTrue(summary.contains("orders.created"), "summary should contain routing key");
     }
 }
