@@ -1,78 +1,63 @@
 # DLQ-Surgeon
 
-> A sole-purpose sidecar scalpel for RabbitMQ Dead Letter Queues.
-> Fetch → edit → validate → re-inject. Stateless. No data loss.
+A CLI tool for repairing and re-injecting messages from RabbitMQ Dead Letter Queues. Fetch a message, edit the payload in your `$EDITOR`, optionally validate it against a JSON Schema, then re-publish it to the original exchange. The source message is deleted only after a publisher confirm is received - if anything fails, nothing is touched.
 
-Distributed as a **GraalVM Native Image** — a single executable binary compiled ahead-of-time directly to machine code. No JRE required, no JVM warmup, ~50 ms startup. Drop it on a server and run it. Also available as a fat JAR for platforms without a matching binary.
+Distributed as a single native binary (no JRE required). Also available as a fat JAR.
 
 ---
 
 ## The Problem
 
-RabbitMQ's Dead Letter Exchanges do their job perfectly — but most messages in DLQs fail for *recoverable* reasons:
+RabbitMQ's Dead Letter Exchanges do their job — but most messages in DLQs fail for recoverable reasons:
 
 - A field was renamed in a deploy (`currency` → `currency_code`)
 - A frontend bug sent `shippingAddress` as a string instead of an object
 - A new required field (`metadata.version`) appeared after a schema migration
 - A transient Redis blip dead-lettered 400 perfectly valid inventory updates
 
-**Current reality:** developers copy the payload from the Management UI, edit it in VS Code, manually reconstruct the original exchange and routing key, and republish with curl — at 2 a.m. in production. One typo = lost message or duplicate processing.
+The usual approach is to copy the payload from the Management UI, edit it locally, manually reconstruct the original exchange and routing key, and republish with curl. One typo can mean a lost message or duplicate processing.
 
-DLQ-Surgeon solves this in 30 seconds with zero risk of data loss.
-
----
-
-## Design Philosophy
-
-| Principle | What it means |
-|---|---|
-| **Stateless** | No internal database. Pure RabbitMQ Management HTTP + AMQP client. |
-| **In-memory-only** | Messages are held in RAM during the edit session. Never written to disk except for the temp file your editor opens (cleaned up on exit). |
-| **Confirm-before-delete** | The original message is deleted from the DLQ *only after* a publisher confirm is received for the repaired message. If publish fails, nothing changes. |
-| **Zero-bloat binary** | Single GraalVM Native Image binary. No JRE required. ~40 MB. <50 ms startup. |
-| **Focused scope** | This tool does one thing. It is not a queue manager. |
+Stateless. No internal database. Messages are held in RAM only - never written to disk except for the temp file your editor opens, which is cleaned up on exit.
 
 ---
 
 ## Quick Start
 
-### Prerequisites
+Download the binary for your platform from the [releases page](../../releases) and make it executable:
 
 ```bash
-# For running the fat JAR (development)
-java 21+
-
-# For building the native binary (production)
-sdk install java 21.0.4-graal   # via SDKMAN
-gu install native-image
+chmod +x dlq-surgeon
 ```
 
-### Build
+**Usage:**
 
-```bash
-# Fat JAR (fast iteration, no GraalVM needed)
-mvn package
-java -jar target/dlq-surgeon-fat.jar --help
-
-# Native binary (production, requires GraalVM)
-mvn -Pnative package
-./target/dlq-surgeon --help
+```
+dlq-surgeon [--profile <name>] <command> [<queue>] [--host <host>] [--user <user>] [--password <password>] [options]
 ```
 
-### Core Workflow
+Against a local RabbitMQ with default credentials (`guest`/`guest` on `localhost`), no flags are needed:
 
 ```bash
-# 1. List all queues and their dead-letter counts
-dlq-surgeon list
+./dlq-surgeon list
+./dlq-surgeon peek orders.dlq
+./dlq-surgeon fix orders.dlq
+```
 
-# 2. Inspect messages without touching anything
-dlq-surgeon peek orders.dead --count 20
+Against a remote host:
 
-# 3. Repair and re-inject
-dlq-surgeon fix orders.dead \
-  --schema ./schemas/order-created.json \
+```bash
+# See all queues (message counts, DLX flag)
+./dlq-surgeon list --host rabbitmq.prod.internal --user admin --password s3cr3t
+
+# Inspect messages without touching anything
+./dlq-surgeon peek orders.dlq --host rabbitmq.prod.internal --user admin --password s3cr3t
+
+# Repair and re-inject, with schema validation
+./dlq-surgeon fix orders.dlq \
   --host rabbitmq.prod.internal \
-  --user admin
+  --user admin \
+  --password s3cr3t \
+  --schema ./schemas/order-created.json
 ```
 
 `fix` will:
@@ -84,6 +69,20 @@ dlq-surgeon fix orders.dead \
 6. Publish to the original exchange + routing key (read from `x-death` headers)
 7. Wait for a publisher confirm from the broker
 8. **Only then** delete the message from the DLQ
+
+---
+
+## Build from Source
+
+```bash
+# Fat JAR (requires Java 21+, no GraalVM needed)
+mvn package
+java -jar target/dlq-surgeon-fat.jar --help
+
+# Native binary (requires GraalVM 21 with native-image)
+mvn -Pnative package
+./target/dlq-surgeon --help
+```
 
 ---
 
@@ -131,45 +130,7 @@ dlq-surgeon fix orders.dlq                    # uses [default]
 dlq-surgeon --profile prod fix orders.dlq     # uses [prod]
 ```
 
-Any flag still passed explicitly on the CLI overrides the config file value.
-
----
-
-## Project Structure
-
-```
-src/main/java/dev/plaaxer/dlqsurgeon/
-│
-├── Main.java                        Entry point → delegates to DlqSurgeon
-├── DlqSurgeon.java                  Root Picocli command, wires subcommands
-│
-├── cli/
-│   ├── ConnectOptions.java          Reusable @Mixin: connection flags for all commands
-│   ├── ListCommand.java             `dlq-surgeon list`  — read-only queue listing
-│   ├── PeekCommand.java             `dlq-surgeon peek`  — read-only message inspection
-│   └── FixCommand.java              `dlq-surgeon fix`   — the surgical repair workflow
-│
-├── client/
-│   ├── ApiHttpClient.java           Thin HTTP client wrapper (auth, error handling)
-│   ├── ManagementClient.java        RabbitMQ Management HTTP API (message fetch, queue info)
-│   └── AmqpPublisher.java           AMQP re-publish with publisher confirms + DLQ ack-delete
-│
-├── model/
-│   ├── RabbitMessage.java           In-memory snapshot of a fetched DLQ message
-│   ├── XDeathEntry.java             Parsed x-death header entry
-│   ├── QueueInfo.java               Queue metadata (name, message count, DLX flag)
-│   └── RepairPlan.java              Immutable plan: target exchange/key + AMQP properties, shown before confirm
-│
-├── surgeon/
-│   ├── MessageFetcher.java          Orchestrates fetching via ManagementClient
-│   ├── PayloadEditor.java           Writes payload to temp file, opens $EDITOR, reads result
-│   ├── SchemaValidator.java         JSON Schema validation before re-injection
-│   └── Reinjector.java              Publish → confirm → delete (the safety-critical step)
-│
-└── tui/
-    ├── Console.java                 Coloured output helpers (info/success/warn/error)
-    └── MessagePicker.java           Interactive numbered list + search for message selection
-```
+Any flag passed explicitly on the CLI overrides the config file value.
 
 ---
 
@@ -187,7 +148,7 @@ When a message is dead-lettered, RabbitMQ **prepends** an entry to the `x-death`
 
 ---
 
-## Adding JSON Schema Validation
+## JSON Schema Validation
 
 Pass `--schema` with a path to a JSON Schema file (Draft-04 through 2020-12):
 
@@ -207,9 +168,3 @@ If the edited payload fails validation, you'll be shown the errors and offered a
   Without this flag, the repaired message carries its full death history (the default, safer behavior).
 - The delete step uses `basic.get` + `basic.ack` (not the bulk Management API delete) to ensure
   exactly the correct message is removed, even if new messages arrived in the DLQ during editing.
-
----
-
-## Contributing
-
-The codebase is intentionally minimal. Before adding a feature, ask: *does this belong in a focused DLQ repair tool, or in a full queue manager?* If the latter, it probably doesn't belong here.
