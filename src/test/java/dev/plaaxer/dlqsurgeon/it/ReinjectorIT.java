@@ -95,27 +95,68 @@ class ReinjectorIT extends RabbitContainerBase {
 
     @Test
     void reinjectAndDelete_preservesEditedPayload() throws Exception {
-        // TODO: original DLQ message has payload A; RepairPlan has edited payload B.
-        //       After reinject, TARGET_QUEUE message must have payload B, not A.
+        byte[] payloadA = "{\"version\":\"A\"}".getBytes();
+        String payloadB = "{\"version\":\"B\"}";
+
+        ch.basicPublish(DEAD_EXCHANGE, DEAD_ROUTING_KEY, null, payloadA);
+
+        ManagementClient mgmt = new ManagementClient(containerOpts());
+        List<RabbitMessage> messages = mgmt.fetchMessages(DEAD_QUEUE, 1);
+        assertEquals(1, messages.size());
+        RabbitMessage source = messages.get(0);
+
+        RepairPlan plan = RepairPlan.from(source, payloadB, TARGET_EXCHANGE, ROUTING_KEY, false);
+
+        reinjector.reinjectAndDelete(plan, source);
+
+        GetResponse got = ch.basicGet(TARGET_QUEUE, true);
+        assertNotNull(got);
+        assertEquals(payloadB, new String(got.getBody()));
+        assertEquals(0, ch.messageCount(DEAD_QUEUE));
     }
 
     // ── Safety invariant ─────────────────────────────────────────────────────
 
     @Test
     void reinjectAndDelete_doesNotDeleteWhenPublishFails() throws Exception {
-        // TODO: build a RepairPlan targeting a non-existent exchange so publish
-        //       fails (mandatory flag or unroutable → returned/NACK).
-        //       Assert: exception is thrown AND DLQ still has the original message.
-        //
-        // This is the most important test in the entire suite. Future me better implement it soon.
+        byte[] payload = "{\"test\":\"safe\"}".getBytes();
+
+        ch.basicPublish(DEAD_EXCHANGE, DEAD_ROUTING_KEY, null, payload);
+
+        ManagementClient mgmt = new ManagementClient(containerOpts());
+        List<RabbitMessage> messages = mgmt.fetchMessages(DEAD_QUEUE, 1);
+        assertEquals(1, messages.size());
+        RabbitMessage source = messages.get(0);
+
+        // Target a non-existent exchange: the broker returns a channel-level 404 error,
+        // causing waitForConfirmsOrDie() to throw before deleteFromDlq() is ever called.
+        RepairPlan plan = RepairPlan.from(source, source.payload(), "no.such.exchange", ROUTING_KEY, false);
+
+        assertThrows(Exception.class, () -> reinjector.reinjectAndDelete(plan, source));
+
+        // Safety invariant: source must still be in the DLQ — nothing was deleted.
+        assertEquals(1, ch.messageCount(DEAD_QUEUE));
     }
 
     @Test
     void reinjectAndDelete_isIdempotentOnRetry() throws Exception {
-        // TODO: call reinjectAndDelete twice with the same source message.
-        //       Second call should either succeed (idempotent) or throw a clear error —
-        //       decide on the expected contract and assert accordingly.
-        //       The goal is to make sure a retry after partial failure does not
-        //       duplicate the message in TARGET_QUEUE.
+        byte[] payload = "{\"test\":\"retry\"}".getBytes();
+
+        ch.basicPublish(DEAD_EXCHANGE, DEAD_ROUTING_KEY, null, payload);
+
+        ManagementClient mgmt = new ManagementClient(containerOpts());
+        List<RabbitMessage> messages = mgmt.fetchMessages(DEAD_QUEUE, 1);
+        assertEquals(1, messages.size());
+        RabbitMessage source = messages.get(0);
+
+        RepairPlan plan = RepairPlan.from(source, source.payload(), TARGET_EXCHANGE, ROUTING_KEY, false);
+
+        // First call: succeeds normally.
+        reinjector.reinjectAndDelete(plan, source);
+        assertEquals(0, ch.messageCount(DEAD_QUEUE));
+
+        // Second call (retry after the fact): DLQ is now empty, so deleteFromDlq()
+        // must throw a clear IOException rather than silently succeeding or panicking.
+        assertThrows(Exception.class, () -> reinjector.reinjectAndDelete(plan, source));
     }
 }
