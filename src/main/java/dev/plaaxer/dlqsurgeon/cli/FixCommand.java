@@ -135,7 +135,7 @@ public class FixCommand implements Callable<Integer> {
         }
 
         RepairPlan plan = RepairPlan.from(selected, editedPayload, targetExchange, targetRoutingKey, stripDeathHeaders);
-        Console.printPlan(plan.summary());
+        Console.printPlan(plan);
         if (!autoConfirm && !Console.confirm("Proceed with re-injection?")) return 0;
 
         try {

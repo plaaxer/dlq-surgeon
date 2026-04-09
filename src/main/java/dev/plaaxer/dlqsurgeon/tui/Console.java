@@ -1,21 +1,29 @@
 package dev.plaaxer.dlqsurgeon.tui;
 
+import dev.plaaxer.dlqsurgeon.model.RepairPlan;
+import org.jline.reader.EndOfFileException;
+import org.jline.reader.LineReader;
+import org.jline.reader.LineReaderBuilder;
+import org.jline.reader.UserInterruptException;
+import org.jline.terminal.Terminal;
+import org.jline.terminal.TerminalBuilder;
 import org.jline.utils.AttributedString;
 import org.jline.utils.AttributedStyle;
 
+import java.io.IOException;
 import java.io.PrintWriter;
 
-/**
- * TODO: Read NO_COLOR env var at startup and disable ANSI codes if set.
- *       See https://no-color.org/
- * TODO: Add a --no-color flag to ConnectOptions (or a global mixin).
- * TODO: Add confirm(String prompt) → boolean for interactive yes/no prompts
- *       using JLine's LineReader.
- */
 public class Console {
 
+    private static boolean noColor = System.getenv("NO_COLOR") != null;
+
     private static PrintWriter out = new PrintWriter(System.out, true);
-    private static PrintWriter err = new PrintWriter(System.err, true);
+    private static final PrintWriter err = new PrintWriter(System.err, true);
+    private static LineReader lineReader;
+
+    public static void configure(boolean disableColor) {
+        noColor = noColor || disableColor;
+    }
 
     public static void info(String message) {
         out.println(message);
@@ -37,22 +45,31 @@ public class Console {
         out.println(colour(message, 8));
     }
 
-    /**
-     * TODO: Accept a RepairPlan and call plan.summary().
-     */
-    public static void printPlan(Object plan) {
-        info(plan.toString());
+    public static void printPlan(RepairPlan plan) {
+        info(plan.summary());
     }
 
     public static boolean confirm(String prompt) {
-        System.out.print(prompt + " [y/N] ");
-        String answer = System.console() != null
-                ? System.console().readLine()
-                : "n";
-        return answer != null && (answer.equalsIgnoreCase("y") || answer.equalsIgnoreCase("yes"));
+        try {
+            String answer = lineReader().readLine(prompt + " [y/N] ");
+            return answer != null && (answer.equalsIgnoreCase("y") || answer.equalsIgnoreCase("yes"));
+        } catch (UserInterruptException | EndOfFileException e) {
+            return false;
+        } catch (IOException e) {
+            return false;
+        }
+    }
+
+    private static LineReader lineReader() throws IOException {
+        if (lineReader == null) {
+            Terminal terminal = TerminalBuilder.builder().system(true).dumb(true).build();
+            lineReader = LineReaderBuilder.builder().terminal(terminal).build();
+        }
+        return lineReader;
     }
 
     private static String colour(String text, int ansiColour) {
+        if (noColor) return text;
         return new AttributedString(text,
                 AttributedStyle.DEFAULT.foreground(ansiColour)).toAnsi();
     }

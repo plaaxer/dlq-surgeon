@@ -66,9 +66,6 @@ public class AmqpPublisher implements Closeable {
      * by message-id (or payload if message-id is absent), then acks it to remove it from
      * the queue. If the head message does not match, it is nacked back (requeued) and an
      * exception is thrown (nothing is deleted).
-     *
-     * Must be called only after a successful publish confirm. Uses the same connection
-     * and channel as the publisher to avoid opening a second AMQP connection.
      */
     public void deleteFromDlq(String queue, RabbitMessage source) throws IOException {
         GetResponse response = channel.basicGet(queue, false); // false = manual ack

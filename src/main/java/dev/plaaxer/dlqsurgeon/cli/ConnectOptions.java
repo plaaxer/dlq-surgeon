@@ -90,11 +90,20 @@ public class ConnectOptions {
     )
     public boolean readOnly;
 
+    // ── TUI ──────────────────────────────────────────────────────────────
+    @Option(
+            names = {"--no-color"},
+            description = "Disable coloured output. Can also be set on .env vars",
+            defaultValue = "false"
+    )
+    public boolean noColor;
+
     /**
      * Prints the active connection target and warns about any options that were
      * not explicitly set on the CLI (defaults).
      */
     public void printConnectionInfo() {
+        Console.configure(noColor);
         Console.dim("Connecting to: " + summary());
 
         List<String> defaulted = new ArrayList<>();
