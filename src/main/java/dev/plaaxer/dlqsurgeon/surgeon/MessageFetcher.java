@@ -35,7 +35,7 @@ public class MessageFetcher {
 
     private final ManagementClient managementClient;
 
-    public MessageFetcher(ConnectOptions opts) {
+    public MessageFetcher(ConnectOptions opts) throws Exception {
         this.managementClient = new ManagementClient(opts);
     }
 

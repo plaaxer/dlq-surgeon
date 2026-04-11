@@ -30,13 +30,18 @@ public class AmqpPublisher implements Closeable {
     private final Connection connection;
     private final Channel channel;
 
-    public AmqpPublisher(ConnectOptions opts) throws IOException, TimeoutException {
+    public AmqpPublisher(ConnectOptions opts) throws Exception {
         ConnectionFactory factory = new ConnectionFactory();
         factory.setHost(opts.host);
         factory.setPort(opts.amqpPort);
         factory.setVirtualHost(opts.vhost);
         factory.setUsername(opts.user);
         factory.setPassword(new String(opts.password));
+
+        javax.net.ssl.SSLContext sslContext = opts.buildSslContext();
+        if (sslContext != null) {
+            factory.useSslProtocol(sslContext);
+        }
 
         this.connection = factory.newConnection("dlq-surgeon");
         this.channel = connection.createChannel();

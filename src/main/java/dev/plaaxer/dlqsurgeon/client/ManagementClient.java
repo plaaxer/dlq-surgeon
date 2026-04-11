@@ -32,8 +32,8 @@ public class ManagementClient {
     private final ApiHttpClient http;
     private final String vhost;
 
-    public ManagementClient(ConnectOptions opts) {
-        this.http = new ApiHttpClient(opts);
+    public ManagementClient(ConnectOptions opts) throws Exception {
+        this.http = new ApiHttpClient(opts, opts.buildSslContext());
         this.vhost = opts.vhost;
     }
 

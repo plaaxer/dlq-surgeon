@@ -2,6 +2,7 @@ package dev.plaaxer.dlqsurgeon.client;
 
 import dev.plaaxer.dlqsurgeon.cli.ConnectOptions;
 
+import javax.net.ssl.SSLContext;
 import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -22,13 +23,18 @@ class ApiHttpClient {
     private final String baseUrl;
     private final String authHeader;
 
-    ApiHttpClient(ConnectOptions opts) {
-        this.http = HttpClient.newBuilder()
+    ApiHttpClient(ConnectOptions opts, SSLContext sslContext) {
+        HttpClient.Builder builder = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(5))
-                .version(HttpClient.Version.HTTP_1_1)
-                .build();
+                .version(HttpClient.Version.HTTP_1_1);
 
-        this.baseUrl = "http://" + opts.host + ":" + opts.managementPort + "/api";
+        if (sslContext != null) {
+            builder.sslContext(sslContext);
+        }
+
+        this.http = builder.build();
+        this.baseUrl = (sslContext != null ? "https" : "http")
+                + "://" + opts.host + ":" + opts.managementPort + "/api";
 
         String credentials = opts.user + ":" + new String(opts.password);
         this.authHeader = "Basic " + Base64.getEncoder().encodeToString(credentials.getBytes());

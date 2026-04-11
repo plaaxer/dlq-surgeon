@@ -1,10 +1,12 @@
 package dev.plaaxer.dlqsurgeon.cli;
 
+import dev.plaaxer.dlqsurgeon.client.SSLManager;
 import dev.plaaxer.dlqsurgeon.tui.Console;
 import picocli.CommandLine.Model.CommandSpec;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.Spec;
 
+import javax.net.ssl.SSLContext;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -76,11 +78,32 @@ public class ConnectOptions {
     )
     public char[] password;
 
-    // ── TLS / mTLS ──────────────────────────────────────────────────────────
-    // TODO: add --tls, --tls-cert, --tls-key, --tls-ca options.
-    //       Can use SSLContext with KeyManagerFactory and TrustManagerFactory.
+    // ----------- TLS -----------
 
-    // ── Safety ──────────────────────────────────────────────────────────────
+    @Option(
+            names = {"--tls"},
+            description = "Enable TLS verification",
+            defaultValue = "false"
+    )
+    public boolean tls;
+
+    @Option(
+            names = {"--tls-cert"},
+            description = "Path to client certificate file [.pem] (for mTLS)"
+    )
+    public String clientCertFilePath;
+
+    @Option(
+            names = {"--tls-key"},
+            description = "Path to client private key [.pem] (for mTLS)"
+    )
+    public String clientPrivateKeyPath;
+
+    @Option(
+            names = {"--tls-ca"},
+            description = "Path to CA certificate file [.pem]"
+    )
+    public String caCertFilePath;
 
     @Option(
             names = {"--read-only"},
@@ -133,8 +156,18 @@ public class ConnectOptions {
         }
     }
 
+    /**
+     * Builds an SSLContext from the TLS flags, or returns null when TLS is disabled.
+     * The result should be cached by callers — this reads files from disk each call.
+     */
+    public SSLContext buildSslContext() throws Exception {
+        if (!tls) return null;
+        return SSLManager.build(caCertFilePath, clientCertFilePath, clientPrivateKeyPath);
+    }
+
     public String summary() {
-        return String.format("amqp://%s@%s:%d/%s  (management: %d)",
+        return String.format("%s://%s@%s:%d/%s  (management: %d)",
+                tls ? "amqps" : "amqp",
                 user, host, amqpPort, vhost.equals("/") ? "%2F" : vhost, managementPort);
     }
 }
