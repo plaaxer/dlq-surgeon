@@ -89,9 +89,10 @@ public class ManagementClient {
     private QueueInfo toQueueInfo(Map<String, Object> raw) {
         String name = (String) raw.get("name");
         int messages = ((Number) raw.getOrDefault("messages", 0)).intValue();
+        int consumers = ((Number) raw.getOrDefault("consumers", 0)).intValue();
         Map<String, Object> args = (Map<String, Object>) raw.getOrDefault("arguments", Map.of());
         boolean hasDlx = args.containsKey("x-dead-letter-exchange");
-        return new QueueInfo(name, messages, hasDlx);
+        return new QueueInfo(name, messages, consumers, hasDlx);
     }
 
     /**

@@ -65,10 +65,27 @@ public class MessageFetcher {
     // ── Printing ─────────────────────────────────────────────────────────────
 
     public void printQueueList(List<QueueInfo> queues) {
-        Console.dim(String.format("%-50s  %5s  %s", "QUEUE", "MSGS", "TYPE"));
+        Console.dim(String.format("%-50s  %5s  %3s  %s", "QUEUE", "MSGS", "CON", "TYPE"));
         Console.dim(HR);
         for (QueueInfo q : queues) {
             printQueue(q);
+        }
+    }
+
+    public void printQueuesJson(List<QueueInfo> queues) {
+        ArrayNode array = MAPPER.createArrayNode();
+        for (QueueInfo q : queues) {
+            ObjectNode node = MAPPER.createObjectNode();
+            node.put("name", q.name());
+            node.put("messages", q.messageCount());
+            node.put("consumers", q.consumers());
+            node.put("hasDlx", q.hasDlx());
+            array.add(node);
+        }
+        try {
+            Console.info(MAPPER.writerWithDefaultPrettyPrinter().writeValueAsString(array));
+        } catch (Exception e) {
+            Console.error("Failed to serialize queues to JSON: " + e.getMessage());
         }
     }
 
