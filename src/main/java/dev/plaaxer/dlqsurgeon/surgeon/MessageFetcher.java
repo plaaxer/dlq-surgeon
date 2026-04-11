@@ -1,5 +1,8 @@
 package dev.plaaxer.dlqsurgeon.surgeon;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import dev.plaaxer.dlqsurgeon.cli.ConnectOptions;
 import dev.plaaxer.dlqsurgeon.client.ManagementClient;
 import dev.plaaxer.dlqsurgeon.model.QueueInfo;
@@ -28,6 +31,7 @@ public class MessageFetcher {
     private static final DateTimeFormatter TS_FMT =
             DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss").withZone(ZoneId.systemDefault());
     private static final String HR = "─".repeat(70);
+    private static final ObjectMapper MAPPER = new ObjectMapper();
 
     private final ManagementClient managementClient;
 
@@ -74,6 +78,71 @@ public class MessageFetcher {
             Console.error(line);
         } else {
             Console.success(line);
+        }
+    }
+
+    public void printMessagesJson(List<RabbitMessage> messages) {
+        ArrayNode array = MAPPER.createArrayNode();
+        for (RabbitMessage msg : messages) {
+            ObjectNode node = MAPPER.createObjectNode();
+            node.put("messageNumber", msg.messageNumber());
+            node.put("exchange", msg.exchange());
+            node.put("routingKey", msg.routingKey());
+            node.put("sourceQueue", msg.sourceQueue());
+            if (msg.contentType() != null) node.put("contentType", msg.contentType());
+            if (msg.messageId() != null)   node.put("messageId", msg.messageId());
+            if (msg.correlationId() != null) node.put("correlationId", msg.correlationId());
+            node.put("deliveryMode", msg.deliveryMode());
+            node.put("redelivered", msg.redelivered());
+            // Embed payload as JSON if valid, otherwise as a plain string
+            try {
+                node.set("payload", MAPPER.readTree(msg.payload()));
+            } catch (Exception e) {
+                node.put("payload", msg.payload());
+            }
+            if (!msg.xDeathEntries().isEmpty()) {
+                ArrayNode xdeath = MAPPER.createArrayNode();
+                for (XDeathEntry e : msg.xDeathEntries()) {
+                    ObjectNode ed = MAPPER.createObjectNode();
+                    ed.put("queue", e.queue());
+                    ed.put("exchange", e.exchange());
+                    ed.put("reason", e.reason());
+                    ed.put("count", e.count());
+                    if (e.time() > 0) ed.put("time", TS_FMT.format(Instant.ofEpochSecond(e.time())));
+                    xdeath.add(ed);
+                }
+                node.set("xDeath", xdeath);
+            }
+            array.add(node);
+        }
+        try {
+            Console.info(MAPPER.writerWithDefaultPrettyPrinter().writeValueAsString(array));
+        } catch (Exception e) {
+            Console.error("Failed to serialize messages to JSON: " + e.getMessage());
+        }
+    }
+
+    public void printMessagesTable(List<RabbitMessage> messages) {
+        String fmt = "%-4s  %-30s  %-25s  %-10s  %-19s  %s";
+        Console.dim(String.format(fmt, "#", "ROUTING-KEY", "EXCHANGE", "REASON", "TIME", "PAYLOAD"));
+        Console.dim(HR);
+        for (RabbitMessage msg : messages) {
+            String reason = "";
+            String time = "";
+            if (!msg.xDeathEntries().isEmpty()) {
+                XDeathEntry latest = msg.xDeathEntries().getFirst();
+                reason = latest.reason();
+                if (latest.time() > 0) time = TS_FMT.format(Instant.ofEpochSecond(latest.time()));
+            }
+            String payloadSnippet = msg.payload().replace('\n', ' ').replace('\r', ' ');
+            if (payloadSnippet.length() > 40) payloadSnippet = payloadSnippet.substring(0, 37) + "...";
+            Console.info(String.format(fmt,
+                    "#" + msg.messageNumber(),
+                    msg.routingKey(),
+                    msg.exchange(),
+                    reason,
+                    time,
+                    payloadSnippet));
         }
     }
 

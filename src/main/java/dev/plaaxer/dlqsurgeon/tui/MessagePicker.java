@@ -59,8 +59,6 @@ public class MessagePicker {
                     }
                 }
 
-                // Redraw after every non-selecting input: clears the previous list and prompt line,
-                // then reprints so lastPrintedLines stays accurate for the next redraw.
                 clearLines(writer, lastPrintedLines);
                 lastPrintedLines = printList(writer, filtered, activeFilter);
             }
