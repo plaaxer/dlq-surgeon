@@ -70,9 +70,8 @@ public class ConnectOptions {
 
     @Option(
             names = {"--password", "-p"},
-            description = "Password (reads from RABBITMQ_PASSWORD env var if not set)",
+            description = "Password (reads from RABBITMQ_PASSWORD env var if not set; prompted interactively when in a TTY and no value is given)",
             defaultValue = "${env:RABBITMQ_PASSWORD:-guest}",
-            // TODO: switch to interactive prompt when running in a TTY and no value is given
             interactive = false
     )
     public char[] password;
@@ -100,16 +99,19 @@ public class ConnectOptions {
 
     /**
      * Prints the active connection target and warns about any options that were
-     * not explicitly set on the CLI (defaults).
+     * not explicitly set on the CLI (defaults). If running in a TTY and no password
+     * was provided, prompts for it interactively instead of falling back to the default.
      */
-    public void printConnectionInfo() {
+    public void printConnectionInfo() throws java.io.IOException {
         Console.configure(noColor);
         Console.dim("Connecting to: " + summary());
 
-        List<String> defaulted = new ArrayList<>();
         var parseResult = spec.commandLine().getParseResult();
+        boolean willPromptPassword = !parseResult.hasMatchedOption("--password") && System.console() != null;
+
+        List<String> defaulted = new ArrayList<>();
         for (String opt : List.of("--host", "--user", "--password")) {
-            if (!parseResult.hasMatchedOption(opt)) {
+            if (!parseResult.hasMatchedOption(opt) && !(opt.equals("--password") && willPromptPassword)) {
                 defaulted.add(opt);
             }
         }
@@ -121,6 +123,13 @@ public class ConnectOptions {
 
         if ("default".equals(profile) && !parseResult.hasMatchedOption("--profile")) {
             Console.warn("Using [default] config profile. Pass --profile <name> to use a named profile.");
+        }
+
+        if (willPromptPassword) {
+            char[] prompted = Console.promptPassword("Password: ");
+            if (prompted.length > 0) {
+                this.password = prompted;
+            }
         }
     }
 

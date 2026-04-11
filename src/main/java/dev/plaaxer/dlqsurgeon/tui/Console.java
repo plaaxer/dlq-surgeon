@@ -49,6 +49,15 @@ public class Console {
         info(plan.summary());
     }
 
+    public static char[] promptPassword(String prompt) throws IOException {
+        try {
+            String input = lineReader().readLine(prompt, '*');
+            return input == null ? new char[0] : input.toCharArray();
+        } catch (UserInterruptException | EndOfFileException e) {
+            return new char[0];
+        }
+    }
+
     public static boolean confirm(String prompt) {
         try {
             String answer = lineReader().readLine(prompt + " [y/N] ");

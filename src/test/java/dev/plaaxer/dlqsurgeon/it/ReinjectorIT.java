@@ -53,7 +53,7 @@ class ReinjectorIT extends RabbitContainerBase {
         ch.queueBind(DEAD_QUEUE, DEAD_EXCHANGE, DEAD_ROUTING_KEY);
     }
 
-    // AfterEach runs even if something breaks, guaranteeing that the connection is always closed.
+    // Junit makes sure the channel is closed
     @AfterEach
     void tearDown() throws Exception {
 
@@ -115,8 +115,6 @@ class ReinjectorIT extends RabbitContainerBase {
         assertEquals(0, ch.messageCount(DEAD_QUEUE));
     }
 
-    // ── Safety invariant ─────────────────────────────────────────────────────
-
     @Test
     void reinjectAndDelete_doesNotDeleteWhenPublishFails() throws Exception {
         byte[] payload = "{\"test\":\"safe\"}".getBytes();
@@ -128,13 +126,13 @@ class ReinjectorIT extends RabbitContainerBase {
         assertEquals(1, messages.size());
         RabbitMessage source = messages.get(0);
 
-        // Target a non-existent exchange: the broker returns a channel-level 404 error,
-        // causing waitForConfirmsOrDie() to throw before deleteFromDlq() is ever called.
+        // this targets a non-existant exchange. the broker returns a channel-level 404 error.
+        // this causes waitForConfirmsOrDie() to throw before deleteFromDlq() is ever called.
         RepairPlan plan = RepairPlan.from(source, source.payload(), "no.such.exchange", ROUTING_KEY, false);
 
         assertThrows(Exception.class, () -> reinjector.reinjectAndDelete(plan, source));
 
-        // Safety invariant: source must still be in the DLQ — nothing was deleted.
+        // making sure the safety invariant has not been compromised
         assertEquals(1, ch.messageCount(DEAD_QUEUE));
     }
 
@@ -150,12 +148,10 @@ class ReinjectorIT extends RabbitContainerBase {
         RabbitMessage source = messages.get(0);
 
         RepairPlan plan = RepairPlan.from(source, source.payload(), TARGET_EXCHANGE, ROUTING_KEY, false);
-
-        // First call: succeeds normally.
         reinjector.reinjectAndDelete(plan, source);
         assertEquals(0, ch.messageCount(DEAD_QUEUE));
 
-        // Second call (retry after the fact): DLQ is now empty, so deleteFromDlq()
+        // the DLQ is now empty, so deleteFromDlq()
         // must throw a clear IOException rather than silently succeeding or panicking.
         assertThrows(Exception.class, () -> reinjector.reinjectAndDelete(plan, source));
     }
