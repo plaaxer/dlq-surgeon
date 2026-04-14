@@ -23,6 +23,18 @@
         </dependency>
 
         <dependency>
+            <groupId>dev.plaaxer.dlqsurgeon</groupId>
+            <artifactId>dlq-surgeon-ai</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
+        <!-- Default AI provider. Swap for langchain4j-open-ai, langchain4j-ollama, etc. -->
+        <dependency>
+            <groupId>dev.langchain4j</groupId>
+            <artifactId>langchain4j-anthropic</artifactId>
+        </dependency>
+
+        <dependency>
             <groupId>info.picocli</groupId>
             <artifactId>picocli</artifactId>
         </dependency>
