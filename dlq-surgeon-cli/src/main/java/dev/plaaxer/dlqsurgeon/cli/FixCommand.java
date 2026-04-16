@@ -88,6 +88,13 @@ public class FixCommand implements Callable<Integer> {
     )
     boolean autoConfirm;
 
+    @Option(
+            names = {"--suggest"},
+            description = "Enable AI suggestions for this fix. Can also be set in the config profile as: suggest = true.",
+            defaultValue = "false"
+    )
+    boolean suggest;
+
     @Override
     public Integer call() throws Exception {
         connect.printConnectionInfo();
@@ -95,6 +102,10 @@ public class FixCommand implements Callable<Integer> {
         if (connect.readOnly) {
             Console.error("Cannot run 'fix' in --read-only mode.");
             return 1;
+        }
+
+        if (suggest && schemaFile == null) {
+            Console.warn("--suggest works best with --schema: the AI uses the schema to understand the expected payload shape.");
         }
 
         ConnectionConfig config = connect.toConnectionConfig();
