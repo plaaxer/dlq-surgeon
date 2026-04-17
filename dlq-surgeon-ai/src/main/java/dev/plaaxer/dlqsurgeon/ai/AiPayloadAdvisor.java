@@ -4,12 +4,12 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.langchain4j.model.chat.ChatLanguageModel;
 import dev.plaaxer.dlqsurgeon.model.RabbitMessage;
+import dev.plaaxer.dlqsurgeon.model.SuggestionResult;
 import dev.plaaxer.dlqsurgeon.model.XDeathEntry;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.stream.Collectors;
 
 /**
  * {@link PayloadAdvisor} implementation backed by any langchain4j {@link ChatLanguageModel}.

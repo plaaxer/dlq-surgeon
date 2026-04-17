@@ -1,11 +1,17 @@
 package dev.plaaxer.dlqsurgeon.cli;
 
+import dev.langchain4j.model.chat.ChatLanguageModel;
+import dev.plaaxer.dlqsurgeon.ai.AiConfig;
+import dev.plaaxer.dlqsurgeon.ai.AiPayloadAdvisor;
 import dev.plaaxer.dlqsurgeon.model.RabbitMessage;
 import dev.plaaxer.dlqsurgeon.model.RepairPlan;
+import dev.plaaxer.dlqsurgeon.model.SuggestionResult;
 import dev.plaaxer.dlqsurgeon.service.FixWorkflow;
 import dev.plaaxer.dlqsurgeon.service.PayloadEditor;
 import dev.plaaxer.dlqsurgeon.tui.Console;
 import dev.plaaxer.dlqsurgeon.tui.MessagePicker;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Mixin;
 import picocli.CommandLine.Option;
@@ -13,6 +19,7 @@ import picocli.CommandLine.Parameters;
 
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.TimeoutException;
 
@@ -35,6 +42,8 @@ import java.util.concurrent.TimeoutException;
         mixinStandardHelpOptions = true
 )
 public class FixCommand implements Callable<Integer> {
+
+    private static final Logger log = LoggerFactory.getLogger(FixCommand.class);
 
     @Mixin
     ConnectOptions connect;
@@ -106,13 +115,13 @@ public class FixCommand implements Callable<Integer> {
 
         var opts = new FixWorkflow.Options(
                 connect.toConnectionConfig(), queueName, count, schemaFile,
-                targetExchange, targetRoutingKey, stripDeathHeaders);
+                targetExchange, targetRoutingKey, stripDeathHeaders, suggest);
 
         try {
             int result = FixWorkflow.run(opts, new FixWorkflow.Hooks() {
                 final PayloadEditor editor = new PayloadEditor(schemaFile);
 
-                public RabbitMessage pick(java.util.List<RabbitMessage> messages) throws Exception {
+                public RabbitMessage pick(List<RabbitMessage> messages) throws Exception {
                     return MessagePicker.pick(messages);
                 }
 
@@ -133,6 +142,20 @@ public class FixCommand implements Callable<Integer> {
                     Console.printPlan(plan);
                     return autoConfirm || Console.confirm("Proceed with re-injection?");
                 }
+
+                public SuggestionResult aiSuggest(RabbitMessage msg, Path schemaFile) throws IOException {
+                    log.debug("AI suggestion called for message {}", msg.messageNumber());
+
+                    if (!suggest) {
+                        throw new IllegalStateException("AI suggestion should not be called under this context. Suggestion not needed");
+                    }
+
+                    ChatLanguageModel chatModel = ModelFactory.build(AiConfig.fromEnv());
+                    AiPayloadAdvisor aiAdvisor = new AiPayloadAdvisor(chatModel);
+
+                    // todo: wrap IOException in suggest for better error communication
+                    return aiAdvisor.suggest(msg, schemaFile);
+                }
             });
             if (result == 1) Console.warn("Queue '" + queueName + "' is empty.");
             else Console.success("Message repaired and re-injected successfully.");
@@ -144,7 +167,7 @@ public class FixCommand implements Callable<Integer> {
             Console.error("Broker rejected the message: " + e.getMessage() + ". Nothing was deleted from the DLQ.");
             return 1;
         } catch (Exception e) {
-            Console.error("Failed to fetch messages from '" + queueName + "': " + e.getMessage());
+            Console.error("Failed to fix messages: " + e.getMessage());
             return 1;
         }
     }

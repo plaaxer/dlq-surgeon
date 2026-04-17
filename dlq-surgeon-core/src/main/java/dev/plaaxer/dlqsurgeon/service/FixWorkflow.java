@@ -3,7 +3,9 @@ package dev.plaaxer.dlqsurgeon.service;
 import dev.plaaxer.dlqsurgeon.config.ConnectionConfig;
 import dev.plaaxer.dlqsurgeon.model.RabbitMessage;
 import dev.plaaxer.dlqsurgeon.model.RepairPlan;
+import dev.plaaxer.dlqsurgeon.model.SuggestionResult;
 
+import java.io.IOException;
 import java.nio.file.Path;
 import java.util.List;
 
@@ -22,7 +24,8 @@ public final class FixWorkflow {
             Path schemaFile,
             String targetExchange,
             String targetRoutingKey,
-            boolean stripDeathHeaders
+            boolean stripDeathHeaders,
+            boolean suggest
     ) {}
 
     public enum ValidationChoice { RE_EDIT, SKIP, ABORT }
@@ -34,6 +37,7 @@ public final class FixWorkflow {
         /** Called only when a schema is configured and validation fails. */
         ValidationChoice onValidationFailure(String formattedErrors);
         boolean confirm(RepairPlan plan);
+        SuggestionResult aiSuggest(RabbitMessage message, Path schemaFile) throws IOException;
     }
 
     private FixWorkflow() {}
@@ -54,6 +58,12 @@ public final class FixWorkflow {
         if (selected == null) return 0;
 
         PayloadEditor editor = new PayloadEditor(opts.schemaFile());
+
+        if (opts.suggest()) {
+            SuggestionResult suggestionResult = hooks.aiSuggest(selected, opts.schemaFile());
+            // todo: continue flow
+        }
+
         String payload = editor.edit(selected.payload());
 
         while (opts.schemaFile() != null) {

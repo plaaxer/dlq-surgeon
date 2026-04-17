@@ -1,6 +1,7 @@
 package dev.plaaxer.dlqsurgeon.ai;
 
 import dev.plaaxer.dlqsurgeon.model.RabbitMessage;
+import dev.plaaxer.dlqsurgeon.model.SuggestionResult;
 
 import java.io.IOException;
 import java.nio.file.Path;

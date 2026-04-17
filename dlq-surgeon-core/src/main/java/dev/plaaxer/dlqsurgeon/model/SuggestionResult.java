@@ -1,4 +1,4 @@
-package dev.plaaxer.dlqsurgeon.ai;
+package dev.plaaxer.dlqsurgeon.model;
 
 /**
  * The result of an AI-assisted payload analysis.
