@@ -2,11 +2,8 @@ package dev.plaaxer.dlqsurgeon.cli;
 
 import dev.plaaxer.dlqsurgeon.model.RabbitMessage;
 import dev.plaaxer.dlqsurgeon.model.RepairPlan;
-import dev.plaaxer.dlqsurgeon.service.MessageFetcher;
+import dev.plaaxer.dlqsurgeon.service.FixWorkflow;
 import dev.plaaxer.dlqsurgeon.service.PayloadEditor;
-import dev.plaaxer.dlqsurgeon.service.Reinjector;
-import dev.plaaxer.dlqsurgeon.service.SchemaValidator;
-import dev.plaaxer.dlqsurgeon.config.ConnectionConfig;
 import dev.plaaxer.dlqsurgeon.tui.Console;
 import dev.plaaxer.dlqsurgeon.tui.MessagePicker;
 import picocli.CommandLine.Command;
@@ -16,7 +13,6 @@ import picocli.CommandLine.Parameters;
 
 import java.io.IOException;
 import java.nio.file.Path;
-import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.TimeoutException;
 
@@ -108,61 +104,49 @@ public class FixCommand implements Callable<Integer> {
             Console.warn("--suggest works best with --schema: the AI uses the schema to understand the expected payload shape.");
         }
 
-        ConnectionConfig config = connect.toConnectionConfig();
-        MessageFetcher fetcher = new MessageFetcher(config);
-        List<RabbitMessage> messages;
+        var opts = new FixWorkflow.Options(
+                connect.toConnectionConfig(), queueName, count, schemaFile,
+                targetExchange, targetRoutingKey, stripDeathHeaders);
+
         try {
-            messages = fetcher.fetch(queueName, count);
-        } catch (Exception e) {
-            Console.error("Failed to fetch messages from '" + queueName + "': " + e.getMessage());
-            return 1;
-        }
-        if (messages.isEmpty()) {
-            Console.warn("Queue '" + queueName + "' is empty.");
-            return 0;
-        }
+            int result = FixWorkflow.run(opts, new FixWorkflow.Hooks() {
+                final PayloadEditor editor = new PayloadEditor(schemaFile);
 
-        RabbitMessage selected = MessagePicker.pick(messages);
-        if (selected == null) return 0; // user quit
-
-        PayloadEditor editor = new PayloadEditor(schemaFile);
-        String editedPayload = editor.edit(selected.payload());
-
-        while (schemaFile != null) {
-            try {
-                SchemaValidator.validate(editedPayload, schemaFile);
-                break; // valid — proceed
-            } catch (SchemaValidator.ValidationException e) {
-                Console.error("Validation failed:\n" + e.formatErrors());
-                String choice = promptValidationChoice();
-                if ("e".equals(choice)) {
-                    editedPayload = editor.edit(editedPayload);
-                } else if ("s".equals(choice)) {
-                    Console.warn("Skipping schema validation.");
-                    break;
-                } else {
-                    Console.info("Aborted.");
-                    return 0;
+                public RabbitMessage pick(java.util.List<RabbitMessage> messages) throws Exception {
+                    return MessagePicker.pick(messages);
                 }
-            }
-        }
 
-        RepairPlan plan = RepairPlan.from(selected, editedPayload, targetExchange, targetRoutingKey, stripDeathHeaders);
-        Console.printPlan(plan);
-        if (!autoConfirm && !Console.confirm("Proceed with re-injection?")) return 0;
+                public String edit(String payload) throws Exception {
+                    return editor.edit(payload);
+                }
 
-        try {
-            new Reinjector(config).reinjectAndDelete(plan, selected);
+                public FixWorkflow.ValidationChoice onValidationFailure(String errors) {
+                    Console.error("Validation failed:\n" + errors);
+                    return switch (promptValidationChoice()) {
+                        case "e" -> FixWorkflow.ValidationChoice.RE_EDIT;
+                        case "s" -> { Console.warn("Skipping schema validation."); yield FixWorkflow.ValidationChoice.SKIP; }
+                        default  -> { Console.info("Aborted."); yield FixWorkflow.ValidationChoice.ABORT; }
+                    };
+                }
+
+                public boolean confirm(RepairPlan plan) {
+                    Console.printPlan(plan);
+                    return autoConfirm || Console.confirm("Proceed with re-injection?");
+                }
+            });
+            if (result == 1) Console.warn("Queue '" + queueName + "' is empty.");
+            else Console.success("Message repaired and re-injected successfully.");
+            return result;
         } catch (TimeoutException e) {
             Console.error("Timed out waiting for broker confirmation. The message was NOT re-injected and nothing was deleted from the DLQ.");
             return 1;
         } catch (IOException e) {
             Console.error("Broker rejected the message: " + e.getMessage() + ". Nothing was deleted from the DLQ.");
             return 1;
+        } catch (Exception e) {
+            Console.error("Failed to fetch messages from '" + queueName + "': " + e.getMessage());
+            return 1;
         }
-
-        Console.success("Message repaired and re-injected successfully.");
-        return 0;
     }
 
     private String promptValidationChoice() {

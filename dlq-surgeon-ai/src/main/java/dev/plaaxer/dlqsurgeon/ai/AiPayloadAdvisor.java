@@ -13,18 +13,6 @@ import java.util.stream.Collectors;
 
 /**
  * {@link PayloadAdvisor} implementation backed by any langchain4j {@link ChatLanguageModel}.
- *
- * <p>The concrete model (Anthropic Claude, OpenAI GPT, Ollama, …) is injected via the
- * constructor — this class has zero provider-specific code.
- *
- * <p>Example wiring with the Anthropic provider (in the CLI module):
- * <pre>{@code
- * ChatLanguageModel model = AnthropicChatModel.builder()
- *         .apiKey(System.getenv("ANTHROPIC_API_KEY"))
- *         .modelName("claude-sonnet-4-5")
- *         .build();
- * PayloadAdvisor advisor = new AiPayloadAdvisor(model);
- * }</pre>
  */
 public class AiPayloadAdvisor implements PayloadAdvisor {
 
@@ -43,8 +31,6 @@ public class AiPayloadAdvisor implements PayloadAdvisor {
         String raw = model.generate(prompt);
         return parseResponse(raw);
     }
-
-    // ── Prompt construction ────────────────────────────────────────────────
 
     private static String buildPrompt(RabbitMessage message, String schemaContent) {
         StringBuilder sb = new StringBuilder();
@@ -90,12 +76,9 @@ public class AiPayloadAdvisor implements PayloadAdvisor {
         return sb.toString();
     }
 
-    // ── Response parsing ───────────────────────────────────────────────────
-
     private static SuggestionResult parseResponse(String raw) {
         String trimmed = raw.strip();
 
-        // Strip markdown code fences if the model wrapped its JSON
         if (trimmed.startsWith("```")) {
             int firstNewline = trimmed.indexOf('\n');
             int lastFence = trimmed.lastIndexOf("```");
@@ -112,7 +95,6 @@ public class AiPayloadAdvisor implements PayloadAdvisor {
             String explanation = root.path("explanation").asText("(no explanation provided)");
             return new SuggestionResult(suggestedPayload, explanation);
         } catch (Exception e) {
-            // Model returned something unparseable — surface the raw text as the explanation.
             return new SuggestionResult(null, "AI response could not be parsed: " + trimmed);
         }
     }

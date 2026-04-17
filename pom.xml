@@ -106,10 +106,28 @@
                 <version>${langchain4j.version}</version>
             </dependency>
 
-            <!-- Anthropic provider — pulled in by dlq-surgeon-cli only. -->
+            <!-- Provider SDKs — pulled in by dlq-surgeon-cli only. -->
             <dependency>
                 <groupId>dev.langchain4j</groupId>
                 <artifactId>langchain4j-anthropic</artifactId>
+                <version>${langchain4j.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>dev.langchain4j</groupId>
+                <artifactId>langchain4j-open-ai</artifactId>
+                <version>${langchain4j.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>dev.langchain4j</groupId>
+                <artifactId>langchain4j-google-ai-gemini</artifactId>
+                <version>${langchain4j.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>dev.langchain4j</groupId>
+                <artifactId>langchain4j-ollama</artifactId>
                 <version>${langchain4j.version}</version>
             </dependency>
 
