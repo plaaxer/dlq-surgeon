@@ -10,6 +10,7 @@ import dev.plaaxer.dlqsurgeon.service.FixWorkflow;
 import dev.plaaxer.dlqsurgeon.service.PayloadEditor;
 import dev.plaaxer.dlqsurgeon.tui.Console;
 import dev.plaaxer.dlqsurgeon.tui.MessagePicker;
+import dev.plaaxer.dlqsurgeon.tui.SuggestionView;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine.Command;
@@ -143,18 +144,28 @@ public class FixCommand implements Callable<Integer> {
                     return autoConfirm || Console.confirm("Proceed with re-injection?");
                 }
 
-                public SuggestionResult aiSuggest(RabbitMessage msg, Path schemaFile) throws IOException {
+                public SuggestionResult aiSuggest(RabbitMessage msg, Path schemaFile) {
                     log.debug("AI suggestion called for message {}", msg.messageNumber());
 
                     if (!suggest) {
                         throw new IllegalStateException("AI suggestion should not be called under this context. Suggestion not needed");
                     }
 
-                    ChatLanguageModel chatModel = ModelFactory.build(AiConfig.fromEnv());
-                    AiPayloadAdvisor aiAdvisor = new AiPayloadAdvisor(chatModel);
+                    try {
+                        ChatLanguageModel chatModel = ModelFactory.build(AiConfig.fromEnv());
+                        AiPayloadAdvisor aiAdvisor = new AiPayloadAdvisor(chatModel);
+                        return aiAdvisor.suggest(msg, schemaFile);
+                    } catch (IOException e) {
+                        log.warn("AI suggestion failed", e);
+                        return new SuggestionResult(null,
+                                "AI suggestion unavailable: " + e.getMessage()
+                                        + "\nYou can still edit the original payload manually.");
+                    }
+                }
 
-                    // todo: wrap IOException in suggest for better error communication
-                    return aiAdvisor.suggest(msg, schemaFile);
+                public FixWorkflow.SuggestionChoice onSuggestion(SuggestionResult result, String originalPayload) {
+                    SuggestionView.render(result, originalPayload);
+                    return SuggestionView.prompt(result.hasSuggestion());
                 }
             });
             if (result == 1) Console.warn("Queue '" + queueName + "' is empty.");

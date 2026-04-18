@@ -77,7 +77,7 @@ public class Console {
         return lineReader;
     }
 
-    private static String colour(String text, int ansiColour) {
+    static String colour(String text, int ansiColour) {
         if (noColor) return text;
         return new AttributedString(text,
                 AttributedStyle.DEFAULT.foreground(ansiColour)).toAnsi();

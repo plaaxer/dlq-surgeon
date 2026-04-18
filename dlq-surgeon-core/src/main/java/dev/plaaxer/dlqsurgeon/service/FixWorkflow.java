@@ -5,7 +5,6 @@ import dev.plaaxer.dlqsurgeon.model.RabbitMessage;
 import dev.plaaxer.dlqsurgeon.model.RepairPlan;
 import dev.plaaxer.dlqsurgeon.model.SuggestionResult;
 
-import java.io.IOException;
 import java.nio.file.Path;
 import java.util.List;
 
@@ -30,6 +29,8 @@ public final class FixWorkflow {
 
     public enum ValidationChoice { RE_EDIT, SKIP, ABORT }
 
+    public enum SuggestionChoice { ACCEPT, REJECT, ABORT }
+
     public interface Hooks {
         /** Return {@code null} to cancel. */
         RabbitMessage pick(List<RabbitMessage> messages) throws Exception;
@@ -37,7 +38,9 @@ public final class FixWorkflow {
         /** Called only when a schema is configured and validation fails. */
         ValidationChoice onValidationFailure(String formattedErrors);
         boolean confirm(RepairPlan plan);
-        SuggestionResult aiSuggest(RabbitMessage message, Path schemaFile) throws IOException;
+        SuggestionResult aiSuggest(RabbitMessage message, Path schemaFile);
+        /** Present the AI suggestion to the user and return their choice. */
+        SuggestionChoice onSuggestion(SuggestionResult result, String originalPayload);
     }
 
     private FixWorkflow() {}
@@ -59,12 +62,17 @@ public final class FixWorkflow {
 
         PayloadEditor editor = new PayloadEditor(opts.schemaFile());
 
+        String initial = selected.payload();
         if (opts.suggest()) {
-            SuggestionResult suggestionResult = hooks.aiSuggest(selected, opts.schemaFile());
-            // todo: continue flow
+            SuggestionResult suggestion = hooks.aiSuggest(selected, opts.schemaFile());
+            SuggestionChoice choice = hooks.onSuggestion(suggestion, initial);
+            if (choice == SuggestionChoice.ABORT) return 0;
+            if (choice == SuggestionChoice.ACCEPT && suggestion.hasSuggestion()) {
+                initial = suggestion.suggestedPayload();
+            }
         }
 
-        String payload = editor.edit(selected.payload());
+        String payload = editor.edit(initial);
 
         while (opts.schemaFile() != null) {
             try {
