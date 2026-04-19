@@ -2,7 +2,9 @@ package dev.plaaxer.dlqsurgeon.cli;
 
 import dev.plaaxer.dlqsurgeon.config.ConnectionConfig;
 import dev.plaaxer.dlqsurgeon.tui.Console;
+import picocli.CommandLine.IDefaultValueProvider;
 import picocli.CommandLine.Model.CommandSpec;
+import picocli.CommandLine.Model.OptionSpec;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.Spec;
 
@@ -129,13 +131,18 @@ public class ConnectOptions {
         Console.dim("Connecting to: " + summary());
 
         var parseResult = spec.commandLine().getParseResult();
-        boolean willPromptPassword = !parseResult.hasMatchedOption("--password") && System.console() != null;
+        IDefaultValueProvider provider = spec.commandLine().getDefaultValueProvider();
+
+        boolean passwordFromCli     = parseResult.hasMatchedOption("--password");
+        boolean passwordFromProfile = isFromProfile(provider, "--password");
+        boolean willPromptPassword  = !passwordFromCli && !passwordFromProfile && System.console() != null;
 
         List<String> defaulted = new ArrayList<>();
         for (String opt : List.of("--host", "--user", "--password")) {
-            if (!parseResult.hasMatchedOption(opt) && !(opt.equals("--password") && willPromptPassword)) {
-                defaulted.add(opt);
-            }
+            if (parseResult.hasMatchedOption(opt)) continue;
+            if (isFromProfile(provider, opt)) continue;
+            if (opt.equals("--password") && willPromptPassword) continue;
+            defaulted.add(opt);
         }
 
         if (!defaulted.isEmpty()) {
@@ -152,6 +159,17 @@ public class ConnectOptions {
             if (prompted.length > 0) {
                 this.password = prompted;
             }
+        }
+    }
+
+    private boolean isFromProfile(IDefaultValueProvider provider, String optName) {
+        if (provider == null) return false;
+        OptionSpec opt = spec.findOption(optName);
+        if (opt == null) return false;
+        try {
+            return provider.defaultValue(opt) != null;
+        } catch (Exception e) {
+            return false;
         }
     }
 
