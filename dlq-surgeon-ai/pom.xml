@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>dev.plaaxer.dlqsurgeon</groupId>
+        <artifactId>dlq-surgeon</artifactId>
+        <version>1.0.0</version>
+    </parent>
+
+    <artifactId>dlq-surgeon-ai</artifactId>
+    <name>dlq-surgeon-ai</name>
+    <description>Provider-agnostic AI advisor — PayloadAdvisor interface + langchain4j implementation.
+        Depends only on langchain4j-core; the concrete ChatLanguageModel (Anthropic, OpenAI, etc.)
+        is wired by the CLI module at startup.</description>
+
+    <dependencies>
+
+        <dependency>
+            <groupId>dev.plaaxer.dlqsurgeon</groupId>
+            <artifactId>dlq-surgeon-core</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
+        <!-- langchain4j-core: ChatLanguageModel interface + message types only.
+             No provider SDK is pulled here; the CLI decides which provider to wire. -->
+        <dependency>
+            <groupId>dev.langchain4j</groupId>
+            <artifactId>langchain4j-core</artifactId>
+        </dependency>
+
+        <!-- Jackson is transitive from core, but declared explicitly for clarity. -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+        </dependency>
+
+        <!-- ─── Testing ──────────────────────────────────────────────────── -->
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.mockito</groupId>
+            <artifactId>mockito-core</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+    </dependencies>
+
+</project>

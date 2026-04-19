@@ -1,14 +1,16 @@
 # DLQ-Surgeon
 
-A CLI tool for repairing and re-injecting messages from RabbitMQ Dead Letter Queues. Fetch a message, edit the payload in your `$EDITOR`, optionally validate it against a JSON Schema, then re-publish it to the original exchange. The source message is deleted only after a publisher confirm is received - if anything fails, nothing is touched.
+A CLI tool for repairing and re-injecting messages from RabbitMQ Dead Letter Queues. Fetch a message, edit the payload (or let an LLM propose the fix from your JSON Schema), optionally validate, then re-publish it to the original exchange. The source message is deleted only after a publisher confirm is received - if anything fails, nothing is touched.
 
-Distributed as a single native binary (no JRE required). Also available as a fat JAR.
+<p align="center">
+  <img src="docs/img_1.png" alt="dlq-surgeon AI-assisted repair" width="820">
+</p>
 
 ---
 
 ## The Problem
 
-RabbitMQ's Dead Letter Exchanges do their job — but most messages in DLQs fail for recoverable reasons:
+RabbitMQ's Dead Letter Exchanges do their job, but most messages in DLQs fail for recoverable reasons:
 
 - A field was renamed in a deploy (`currency` → `currency_code`)
 - A frontend bug sent `shippingAddress` as a string instead of an object
@@ -17,17 +19,44 @@ RabbitMQ's Dead Letter Exchanges do their job — but most messages in DLQs fail
 
 The usual approach is to copy the payload from the Management UI, edit it locally, manually reconstruct the original exchange and routing key, and republish with curl. One typo can mean a lost message or duplicate processing.
 
-Stateless. No internal database. Messages are held in RAM only - never written to disk except for the temp file your editor opens, which is cleaned up on exit.
+DLQ-surgeon was made to fill every gap in that loop, now with AI assistance.
+
+---
+
+## Install
+
+**One-liner (Linux x86_64, installs to `~/.local/bin`):**
+
+```bash
+curl -fsSL https://github.com/plaaxer/dlq-surgeon/releases/latest/download/install.sh | sh
+```
+
+Pin to a specific release:
+
+```bash
+curl -fsSL https://github.com/plaaxer/dlq-surgeon/releases/download/v1.0.0/install.sh \
+  | sh -s -- --version v1.0.0
+```
+
+Install system-wide instead:
+
+```bash
+curl -fsSL https://github.com/plaaxer/dlq-surgeon/releases/latest/download/install.sh \
+  | sudo sh -s -- --prefix /usr/local/bin
+```
+
+If `~/.local/bin` isn't on your `$PATH`, the script prints the line to add to your shell rc.
+
+> **Bleeding-edge installer (track master):** if a release ships with a broken installer and a fix has landed on master, you can bypass the release asset:
+> ```bash
+> curl -fsSL https://raw.githubusercontent.com/plaaxer/dlq-surgeon/master/install.sh | sh
+> ```
+
+**Manual:** download the `dlq-surgeon` binary or `dlq-surgeon-fat.jar` from the [releases page](../../releases) and `chmod +x` the binary.
 
 ---
 
 ## Quick Start
-
-Download the binary for your platform from the [releases page](../../releases) and make it executable:
-
-```bash
-chmod +x dlq-surgeon
-```
 
 **Usage:**
 
@@ -63,12 +92,50 @@ Against a remote host:
 `fix` will:
 1. Fetch messages from the DLQ (held in memory only)
 2. Show an interactive picker — select the message to repair
-3. Open the payload in your `$EDITOR`
-4. Validate the edited payload against the JSON Schema (if `--schema` is given)
-5. Show the full repair plan and ask for confirmation
-6. Publish to the original exchange + routing key (read from `x-death` headers)
-7. Wait for a publisher confirm from the broker
-8. **Only then** delete the message from the DLQ
+3. **If `--suggest`:** ask the configured LLM for a repaired payload, show a diff, and prompt for `a` / `e` / `r` / `q` (see below)
+4. Open the payload in your `$EDITOR` (skipped on "accept as-is")
+5. Validate the edited payload against the JSON Schema (if `--schema` is given)
+6. Show the full repair plan and ask for confirmation
+7. Publish to the original exchange + routing key (read from `x-death` headers)
+8. Wait for a publisher confirm from the broker
+9. **Only then** delete the message from the DLQ
+
+---
+
+## AI-Assisted Repair
+
+Pass `--suggest` to have an LLM read the dead-lettered payload plus your JSON Schema and propose a repaired version. You review a unified diff and pick:
+
+- **`[a]` accept as-is** — publish the suggestion verbatim, skip the editor
+- **`[e]` accept & edit** — open the suggestion in `$EDITOR` for final tweaks
+- **`[r]` reject** — edit the original payload yourself
+- **`[q]` abort** — change nothing
+
+```bash
+dlq-surgeon fix orders.dlq --suggest --schema ./schemas/order-created.json
+```
+
+The suggestion is always shown for human review — nothing is republished without your confirmation, and the standard repair-plan prompt still runs at the end. `--suggest` works best paired with `--schema`; the model uses the schema as the source of truth for the expected payload shape.
+
+### Providers
+
+Four providers supported via [langchain4j](https://github.com/langchain4j/langchain4j). Set one in `~/.dlq-surgeon/config.toml` (shared across all profiles):
+
+```toml
+[ai]
+provider = "anthropic"           # anthropic | openai | gemini | ollama
+api_key  = "sk-ant-..."
+model    = "claude-sonnet-4-6"   # optional — sensible default per provider
+```
+
+| Provider | Default model | API key env var | Notes |
+|---|---|---|---|
+| `anthropic` | `claude-sonnet-4-6` | `ANTHROPIC_API_KEY` | default |
+| `openai` | `gpt-4o` | `OPENAI_API_KEY` | set `base_url` for OpenAI-compatible endpoints (vLLM, LM Studio) |
+| `gemini` | `gemini-2.0-flash` | `GEMINI_API_KEY` | |
+| `ollama` | `llama3.2` | — | local; `base_url` defaults to `http://localhost:11434` |
+
+`chmod 600 ~/.dlq-surgeon/config.toml` if it holds an API key. Env vars still work as fallback (see [`.env.example`](./.env.example)).
 
 ---
 
@@ -121,6 +188,12 @@ vhost    = "orders"
 host     = "rabbitmq.staging.internal"
 user     = "admin"
 password = "stagingsecret"
+
+[ai]
+provider = "anthropic"                 # anthropic | openai | gemini | ollama
+api_key  = "sk-ant-..."
+model    = "claude-sonnet-4-6"         # optional; sensible default per provider
+base_url = "http://localhost:11434"    # only needed for ollama / custom endpoints
 ```
 
 Then just:
@@ -131,6 +204,8 @@ dlq-surgeon --profile prod fix orders.dlq     # uses [prod]
 ```
 
 Any flag passed explicitly on the CLI overrides the config file value.
+
+The `[ai]` section is shared across all profiles. Resolution order: `[ai]` key → matching env var (`DLQ_AI_PROVIDER`, `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` / `GEMINI_API_KEY` / `DLQ_AI_API_KEY`, `DLQ_AI_MODEL`, `DLQ_AI_BASE_URL`) → built-in default. `chmod 600 ~/.dlq-surgeon/config.toml` if it holds an API key.
 
 ---
 
