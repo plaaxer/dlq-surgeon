@@ -12,6 +12,10 @@ public class ProfileConfigProvider implements IDefaultValueProvider {
         this.config = new ConfigFile(profileName);
     }
 
+    public ConfigFile configFile() {
+        return config;
+    }
+
     @Override
     public String defaultValue(ArgSpec argSpec) {
         if (!(argSpec instanceof OptionSpec opt)) return null;

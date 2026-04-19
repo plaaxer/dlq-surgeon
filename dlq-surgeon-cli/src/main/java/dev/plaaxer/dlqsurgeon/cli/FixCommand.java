@@ -15,8 +15,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Mixin;
+import picocli.CommandLine.Model.CommandSpec;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.Parameters;
+import picocli.CommandLine.Spec;
 
 import java.io.IOException;
 import java.nio.file.Path;
@@ -48,6 +50,9 @@ public class FixCommand implements Callable<Integer> {
 
     @Mixin
     ConnectOptions connect;
+
+    @Spec
+    CommandSpec spec;
 
     @Parameters(index = "0", paramLabel = "QUEUE", description = "DLQ name to repair from.")
     String queueName;
@@ -152,7 +157,7 @@ public class FixCommand implements Callable<Integer> {
                     }
 
                     try {
-                        ChatLanguageModel chatModel = ModelFactory.build(AiConfig.fromEnv());
+                        ChatLanguageModel chatModel = ModelFactory.build(resolveAiConfig());
                         AiPayloadAdvisor aiAdvisor = new AiPayloadAdvisor(chatModel);
                         return aiAdvisor.suggest(msg, schemaFile);
                     } catch (IOException e) {
@@ -181,6 +186,14 @@ public class FixCommand implements Callable<Integer> {
             Console.error("Failed to fix messages: " + e.getMessage());
             return 1;
         }
+    }
+
+    private AiConfig resolveAiConfig() {
+        var provider = spec.commandLine().getDefaultValueProvider();
+        if (provider instanceof ProfileConfigProvider p) {
+            return AiConfig.resolve(p.configFile()::getAi);
+        }
+        return AiConfig.fromEnv();
     }
 
     private String promptValidationChoice() {
