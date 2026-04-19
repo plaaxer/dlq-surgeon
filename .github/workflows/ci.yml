@@ -58,4 +58,5 @@ jobs:
           files: |
             target/dlq-surgeon
             target/dlq-surgeon-fat.jar
+            install.sh
           generate_release_notes: true

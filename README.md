@@ -21,13 +21,40 @@ Stateless. No internal database. Messages are held in RAM only - never written t
 
 ---
 
-## Quick Start
+## Install
 
-Download the binary for your platform from the [releases page](../../releases) and make it executable:
+**One-liner (Linux x86_64, installs to `~/.local/bin`):**
 
 ```bash
-chmod +x dlq-surgeon
+curl -fsSL https://github.com/plaaxer/dlq-surgeon/releases/latest/download/install.sh | sh
 ```
+
+Pin to a specific release:
+
+```bash
+curl -fsSL https://github.com/plaaxer/dlq-surgeon/releases/download/v1.0.0/install.sh \
+  | sh -s -- --version v1.0.0
+```
+
+Install system-wide instead:
+
+```bash
+curl -fsSL https://github.com/plaaxer/dlq-surgeon/releases/latest/download/install.sh \
+  | sudo sh -s -- --prefix /usr/local/bin
+```
+
+If `~/.local/bin` isn't on your `$PATH`, the script prints the line to add to your shell rc.
+
+> **Bleeding-edge installer (track master):** if a release ships with a broken installer and a fix has landed on master, you can bypass the release asset:
+> ```bash
+> curl -fsSL https://raw.githubusercontent.com/plaaxer/dlq-surgeon/master/install.sh | sh
+> ```
+
+**Manual:** download the `dlq-surgeon` binary or `dlq-surgeon-fat.jar` from the [releases page](../../releases) and `chmod +x` the binary.
+
+---
+
+## Quick Start
 
 **Usage:**
 
