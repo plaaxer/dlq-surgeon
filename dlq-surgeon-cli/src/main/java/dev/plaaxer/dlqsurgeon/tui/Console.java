@@ -15,10 +15,16 @@ import java.io.PrintWriter;
 
 public class Console {
 
-    private static boolean noColor = System.getenv("NO_COLOR") != null;
+    private static boolean noColor = isNoColorSet();
+
+    private static boolean isNoColorSet() {
+        String v = System.getenv("NO_COLOR");
+        return v != null && !v.isEmpty();
+    }
 
     private static PrintWriter out = new PrintWriter(System.out, true);
     private static final PrintWriter err = new PrintWriter(System.err, true);
+    private static Terminal terminal;
     private static LineReader lineReader;
 
     public static void configure(boolean disableColor) {
@@ -69,10 +75,22 @@ public class Console {
         }
     }
 
-    private static LineReader lineReader() throws IOException {
+    /**
+     * Returns the shared system terminal, built lazily on first access and
+     * reused by every TUI component. Falls back to a dumb terminal if jline
+     * cannot attach a real one (keeps prompts functional without warnings).
+     */
+    public static Terminal terminal() throws IOException {
+        if (terminal == null) {
+            terminal = TerminalBuilder.builder().system(true).dumb(true).build();
+        }
+        return terminal;
+    }
+
+    /** Returns the shared {@link LineReader} backed by {@link #terminal()}. */
+    public static LineReader lineReader() throws IOException {
         if (lineReader == null) {
-            Terminal terminal = TerminalBuilder.builder().system(true).dumb(true).build();
-            lineReader = LineReaderBuilder.builder().terminal(terminal).build();
+            lineReader = LineReaderBuilder.builder().terminal(terminal()).build();
         }
         return lineReader;
     }

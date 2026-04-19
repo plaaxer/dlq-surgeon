@@ -2,9 +2,7 @@ package dev.plaaxer.dlqsurgeon.tui;
 
 import dev.plaaxer.dlqsurgeon.model.RabbitMessage;
 import org.jline.reader.LineReader;
-import org.jline.reader.LineReaderBuilder;
 import org.jline.terminal.Terminal;
-import org.jline.terminal.TerminalBuilder;
 
 import java.io.IOException;
 import java.io.PrintWriter;
@@ -22,46 +20,45 @@ public class MessagePicker {
      * @return The selected message, or null if the user typed "q" or pressed Ctrl+C.
      */
     public static RabbitMessage pick(List<RabbitMessage> messages) throws IOException {
-        try (Terminal terminal = TerminalBuilder.builder().system(true).build()) {
-            PrintWriter writer = terminal.writer();
-            LineReader reader = LineReaderBuilder.builder().terminal(terminal).build();
+        Terminal terminal = Console.terminal();
+        PrintWriter writer = terminal.writer();
+        LineReader reader = Console.lineReader();
 
-            List<RabbitMessage> filtered = messages;
-            String activeFilter = null;
-            int lastPrintedLines = printList(writer, filtered, activeFilter);
+        List<RabbitMessage> filtered = messages;
+        String activeFilter = null;
+        int lastPrintedLines = printList(writer, filtered, activeFilter);
 
-            while (true) {
-                String input;
-                try {
-                    input = reader.readLine(buildPrompt(filtered.size(), activeFilter)).trim();
-                } catch (org.jline.reader.UserInterruptException | org.jline.reader.EndOfFileException e) {
-                    return null;
-                }
-
-                if (input.equalsIgnoreCase("q")) return null;
-
-                if (input.startsWith("/")) {
-                    String term = input.substring(1).trim();
-                    activeFilter = term.isEmpty() ? null : term;
-                    String filterTerm = activeFilter;
-                    filtered = filterTerm == null ? messages
-                            : messages.stream()
-                                .filter(m -> matchesFilter(m, filterTerm))
-                                .toList();
-                } else {
-                    if (!filtered.isEmpty()) {
-                        try {
-                            int idx = Integer.parseInt(input);
-                            if (idx >= 1 && idx <= filtered.size()) {
-                                return filtered.get(idx - 1);
-                            }
-                        } catch (NumberFormatException ignored) {}
-                    }
-                }
-
-                clearLines(writer, lastPrintedLines);
-                lastPrintedLines = printList(writer, filtered, activeFilter);
+        while (true) {
+            String input;
+            try {
+                input = reader.readLine(buildPrompt(filtered.size(), activeFilter)).trim();
+            } catch (org.jline.reader.UserInterruptException | org.jline.reader.EndOfFileException e) {
+                return null;
             }
+
+            if (input.equalsIgnoreCase("q")) return null;
+
+            if (input.startsWith("/")) {
+                String term = input.substring(1).trim();
+                activeFilter = term.isEmpty() ? null : term;
+                String filterTerm = activeFilter;
+                filtered = filterTerm == null ? messages
+                        : messages.stream()
+                            .filter(m -> matchesFilter(m, filterTerm))
+                            .toList();
+            } else {
+                if (!filtered.isEmpty()) {
+                    try {
+                        int idx = Integer.parseInt(input);
+                        if (idx >= 1 && idx <= filtered.size()) {
+                            return filtered.get(idx - 1);
+                        }
+                    } catch (NumberFormatException ignored) {}
+                }
+            }
+
+            clearLines(writer, lastPrintedLines);
+            lastPrintedLines = printList(writer, filtered, activeFilter);
         }
     }
 
