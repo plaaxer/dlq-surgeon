@@ -29,7 +29,7 @@ public final class FixWorkflow {
 
     public enum ValidationChoice { RE_EDIT, SKIP, ABORT }
 
-    public enum SuggestionChoice { ACCEPT, REJECT, ABORT }
+    public enum SuggestionChoice { ACCEPT_AS_IS, ACCEPT_AND_EDIT, REJECT, ABORT }
 
     public interface Hooks {
         /** Return {@code null} to cancel. */
@@ -63,16 +63,26 @@ public final class FixWorkflow {
         PayloadEditor editor = new PayloadEditor(opts.schemaFile());
 
         String initial = selected.payload();
+        boolean skipEditor = false;
         if (opts.suggest()) {
             SuggestionResult suggestion = hooks.aiSuggest(selected, opts.schemaFile());
             SuggestionChoice choice = hooks.onSuggestion(suggestion, initial);
-            if (choice == SuggestionChoice.ABORT) return 0;
-            if (choice == SuggestionChoice.ACCEPT && suggestion.hasSuggestion()) {
-                initial = suggestion.suggestedPayload();
+            switch (choice) {
+                case ABORT -> { return 0; }
+                case ACCEPT_AS_IS -> {
+                    if (suggestion.hasSuggestion()) {
+                        initial = suggestion.suggestedPayload();
+                        skipEditor = true;
+                    }
+                }
+                case ACCEPT_AND_EDIT -> {
+                    if (suggestion.hasSuggestion()) initial = suggestion.suggestedPayload();
+                }
+                case REJECT -> { /* keep original */ }
             }
         }
 
-        String payload = editor.edit(initial);
+        String payload = skipEditor ? initial : editor.edit(initial);
 
         while (opts.schemaFile() != null) {
             try {

@@ -5,10 +5,7 @@ import dev.plaaxer.dlqsurgeon.model.SuggestionResult;
 import dev.plaaxer.dlqsurgeon.service.FixWorkflow.SuggestionChoice;
 import org.jline.reader.EndOfFileException;
 import org.jline.reader.LineReader;
-import org.jline.reader.LineReaderBuilder;
 import org.jline.reader.UserInterruptException;
-import org.jline.terminal.Terminal;
-import org.jline.terminal.TerminalBuilder;
 import org.jline.utils.AttributedStyle;
 
 import java.io.IOException;
@@ -67,13 +64,14 @@ public final class SuggestionView {
 
     public static SuggestionChoice prompt(boolean hasSuggestion) {
         String options = hasSuggestion
-                ? "  [a] accept & edit suggestion   [r] reject & edit original   [q] abort: "
+                ? "  [a] accept as-is   [e] accept & edit   [r] reject & edit original   [q] abort: "
                 : "  [r] edit original   [q] abort: ";
-        try (Terminal terminal = TerminalBuilder.builder().system(true).build()) {
-            LineReader reader = LineReaderBuilder.builder().terminal(terminal).build();
+        try {
+            LineReader reader = Console.lineReader();
             String input = reader.readLine(options).trim().toLowerCase();
             return switch (input) {
-                case "a" -> hasSuggestion ? SuggestionChoice.ACCEPT : SuggestionChoice.ABORT;
+                case "a" -> hasSuggestion ? SuggestionChoice.ACCEPT_AS_IS : SuggestionChoice.ABORT;
+                case "e" -> hasSuggestion ? SuggestionChoice.ACCEPT_AND_EDIT : SuggestionChoice.ABORT;
                 case "r" -> SuggestionChoice.REJECT;
                 default  -> SuggestionChoice.ABORT;
             };

@@ -42,7 +42,8 @@ public record RabbitMessage(
 
     /**
      * Returns a short display label for use in the message picker list.
-     * Example: "#3  orders.created  → orders.dlx  rejected  03-23 16:49:08"
+     * Example:
+     *   "#3  orders.created → orders.dlx  rejected  03-23 16:49:08  ×2  {"orderId":"..."
      */
     public String label() {
         String reason = "";
@@ -54,8 +55,21 @@ public record RabbitMessage(
                 time = LABEL_FMT.format(Instant.ofEpochSecond(latest.time()));
             }
         }
-        return String.format("#%-3d %-30s → %-25s %-10s %s",
-                messageNumber, routingKey, exchange, reason, time);
+        long totalDeaths = xDeathEntries.stream().mapToLong(XDeathEntry::count).sum();
+        String deathTag = totalDeaths > 1 ? "×" + totalDeaths : "   ";
+        return String.format("#%-3d %-24s → %-20s %-10s %s  %-4s  %s",
+                messageNumber, routingKey, exchange, reason, time, deathTag, payloadPreview(80));
+    }
+
+    /**
+     * Returns a single-line, whitespace-collapsed preview of the payload,
+     * truncated to {@code max} characters. Empty string if the payload is null.
+     */
+    public String payloadPreview(int max) {
+        if (payload == null || payload.isEmpty()) return "";
+        String compact = payload.replaceAll("\\s+", " ").strip();
+        if (compact.length() <= max) return compact;
+        return compact.substring(0, max - 1) + "…";
     }
 
     /** True if this message has at least one x-death entry. */
